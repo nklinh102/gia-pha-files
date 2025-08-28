@@ -8,12 +8,12 @@
   "theme_color": "#3d2c2c",
   "icons": [
     {
-      "src": "images/icon-192x192.png",
+      "src": "https://cdn.jsdelivr.net/gh/nklinh102/gia-pha-files@main/images/icon-192x192.png",
       "type": "image/png",
       "sizes": "192x192"
     },
     {
-      "src": "images/icon-512x512.png",
+      "src": "https://cdn.jsdelivr.net/gh/nklinh102/gia-pha-files@main/images/icon-512x512.png",
       "type": "image/png",
       "sizes": "512x512"
     }
