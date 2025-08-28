@@ -10,7 +10,7 @@
     <link crossorigin='anonymous' href='https://fonts.gstatic.com' rel='preconnect'/>
     <link href='https://fonts.googleapis.com/css2?family=Tac+One&amp;display=swap' rel='stylesheet'/>
     
-    <link href='https://cdn.jsdelivr.net/gh/nklinh102/gia-pha-files@main/manifest.json' rel='manifest'/>
+    <link href='manifest.json' rel='manifest'/>
     
     <script src='https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js'/>
     
@@ -2046,7 +2046,7 @@
     // ====== ĐĂNG KÝ SERVICE WORKER ======
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('https://cdn.jsdelivr.net/gh/nklinh102/gia-pha-files@main/sw.js')
+        navigator.serviceWorker.register('sw.js')
           .then(registration => {
             console.log('ServiceWorker registration successful with scope: ', registration.scope);
           })
@@ -2059,4 +2059,5 @@
     //]]>
     </script>
   </body>
+
 </html>
