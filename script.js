@@ -1260,6 +1260,3 @@ if ('serviceWorker' in navigator) {
       });
   });
 }
-</script>
-</body>
-</html>
