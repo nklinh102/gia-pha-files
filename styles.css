@@ -227,7 +227,20 @@ justify-content: space-between; padding: 5px 2px; font-size: 13px; }
 font-size:11px; padding:.12rem .35rem; border:1px solid var(--border); border-radius:6px; background:var(--bg) }
 .btn-group { display: flex; gap: 8px;
 }
-#bottom-right-ui { position: absolute; bottom: 12px; right: 12px; z-index: 10; display: flex; align-items: flex-end; gap: 8px;
+#bottom-right-ui { 
+  position: absolute; 
+  bottom: 12px; 
+  right: 12px; 
+  z-index: 10; 
+  display: flex; 
+  align-items: flex-end; 
+  gap: 8px;
+  pointer-events: none; /* Thêm dòng này */
+}
+
+/* Thêm đoạn mã này ngay bên dưới */
+#bottom-right-ui > * {
+  pointer-events: auto;
 }
 #minimap { position: relative; bottom: auto; right: auto; }
 #minimap.hidden { opacity: 0;
