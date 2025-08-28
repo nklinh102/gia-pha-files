@@ -2,11 +2,9 @@
 const CACHE_NAME = 'family-tree-cache-v1';
 
 // Danh sách các file cần thiết để ứng dụng hoạt động offline
+// CHỈ LƯU TRANG CHỦ ĐỂ ĐẢM BẢO TÍNH ỔN ĐỊNH
 const URLS_TO_CACHE = [
-  '/', // Trang HTML chính của bạn
-  'https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js',
-  'https://fonts.googleapis.com/css2?family=Tac+One&display=swap'
-  // Chúng ta không cache các file API của Google vì chúng cần luôn được cập nhật
+  '/'
 ];
 
 // 1. Cài đặt Service Worker và cache các tài nguyên
