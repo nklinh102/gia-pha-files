@@ -430,6 +430,7 @@ font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   color: var(--ink);
 }
 
+/* **ĐIỂM THAY ĐỔI 3: Cập nhật toàn bộ CSS cho bảng tin** */
 #info-panel {
   position: absolute;
   bottom: 20px;
@@ -438,11 +439,6 @@ font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   width: 240px;
   padding: 12px;
   transition: transform .3s ease, opacity .3s ease, visibility .3s ease;
-  
-  /* Bố cục mới cho info panel */
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
 }
 #info-panel.hidden {
   transform: translateY(10px);
@@ -450,21 +446,23 @@ font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   visibility: hidden;
   pointer-events: none;
 }
-.info-text-content {
-  flex-grow: 1;
+.info-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
 }
 #info-panel h3 {
-  margin: 0 0 12px;
+  margin: 0;
   font-size: 15px;
   font-weight: bold;
   color: var(--accent);
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 8px;
   
   /* Cho phép tên dài xuống dòng */
   white-space: normal;
-  overflow: visible;
-  text-overflow: unset;
   word-break: break-word;
 }
 .info-grid {
