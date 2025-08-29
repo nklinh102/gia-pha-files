@@ -318,7 +318,10 @@ function drawNode(node) {
     ctx.shadowColor = 'transparent';
     
     const name = node.name || 'Chưa đặt tên';
-    const meta = [node.birth || '', node.death ? `– ${node.death}` : ''].join(' ').trim();
+    let meta = '';
+    if (node.depth < 2) { // Chỉ hiện năm sinh/mất cho Đời 1 và 2
+        meta = [node.birth || '', node.death ? `– ${node.death}` : ''].join(' ').trim();
+    }
     ctx.fillStyle = (isSpecialDepth) ? '#c0392b' : getCssVar('--ink');
     ctx.textAlign = 'center';
     
