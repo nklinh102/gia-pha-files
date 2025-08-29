@@ -773,11 +773,11 @@ function generateSVGString() {
     <g>${paths}</g><g>${nodesSVG}</g></svg>`;
 }
 
-async function convertSVGtoJPG(quality = 0.9) {
+async function convertSVGtoJPG(svgString, quality = 0.9) { // <-- Thêm svgString vào đây
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     const img = new Image();
-    const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' }); // Dòng này giờ đã đúng
     const url = URL.createObjectURL(svgBlob);
     const loadImagePromise = new Promise((resolve, reject) => {
         img.onload = () => resolve();
@@ -805,7 +805,7 @@ $('#btnExportJPG').onclick = async () => {
             alert('Chưa có dữ liệu để xuất.');
             return;
         }
-        const jpgDataUrl = await convertSVGtoJPG(svgString);
+        const jpgDataUrl = await convertSVGtoJPG(svgString); // <-- Truyền svgString vào đây
         download('gia-pha.jpg', jpgDataUrl);
     } catch (err) {
         console.error('Lỗi chuyển đổi SVG sang JPG:', err);
