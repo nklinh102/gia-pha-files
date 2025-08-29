@@ -482,8 +482,8 @@ function updateSelectionActions() {
     if (highlightedNodeId && isOwner) {
         const node = findById(data, highlightedNodeId);
         if (node) {
-            $('#selection-name-value').textContent = node.name; // Chỉ cập nhật tên
-        
+            $('#selection-name-value').textContent = node.name;
+            
             const avatarEl = $('#selection-avatar');
             if (node.avatarUrl) {
                 avatarEl.style.backgroundImage = `url(${node.avatarUrl})`;
@@ -575,6 +575,22 @@ function updateInfoPanel(nodeId) {
     }
     $('#info-brothers').textContent = `${olderBrothers} anh trai và ${youngerBrothers} em trai`;
     
+    const birthItem = $('#info-birth-item');
+    if (node.birth) {
+        $('#info-birth').textContent = node.birth;
+        birthItem.style.display = 'block';
+    } else {
+        birthItem.style.display = 'none';
+    }
+
+    const deathItem = $('#info-death-item');
+    if (node.death) {
+        $('#info-death').textContent = node.death;
+        deathItem.style.display = 'block';
+    } else {
+        deathItem.style.display = 'none';
+    }
+
     panel.classList.remove('hidden');
 }
 
