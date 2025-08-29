@@ -319,7 +319,8 @@ function drawNode(node) {
     
     const name = node.name || 'Chưa đặt tên';
     let meta = '';
-    if (node.depth < 2) { // Chỉ hiện năm sinh/mất cho Đời 1 và 2
+    // **ĐIỂM THAY ĐỔI 1: Chỉ hiện năm sinh/mất cho Đời 1 (depth 0) và Đời 2 (depth 1)**
+    if (node.depth < 2) { 
         meta = [node.birth || '', node.death ? `– ${node.death}` : ''].join(' ').trim();
     }
     ctx.fillStyle = (isSpecialDepth) ? '#c0392b' : getCssVar('--ink');
