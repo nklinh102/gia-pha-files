@@ -1,6 +1,9 @@
 // ===================================================================
 // ====== THÔNG TIN CẤU HÌNH ======
 // ===================================================================
+const CLOUDINARY_CLOUD_NAME = 'docowfdvd';
+const CLOUDINARY_UPLOAD_PRESET = 'gia_pha_preset';
+
 const API_KEY = 'AIzaSyAOnCKz1lJjkWvJhWuhc9p0GMXcq3EJ-5U';
 const CLIENT_ID = '44689282931-21nb0br3on3v8dscjfibrfutg7isj9fj.apps.googleusercontent.com';
 const SPREADSHEET_ID = '1z-LGeQo8w0jzF9mg8LD_bMsXKEvtgc_lgY5F-EkTgBY';
@@ -97,9 +100,9 @@ async function saveTreeData() {
     try {
         await gapi.client.sheets.spreadsheets.values.clear({ spreadsheetId: SPREADSHEET_ID, range: currentSheetName });
         if (data) {
-            const rows = [['id', 'parentId', 'name', 'birth', 'death', 'note']];
+            const rows = [['id', 'parentId', 'name', 'birth', 'death', 'note', 'avatarUrl']];
             (function walk(node, parentId = '') {
-                rows.push([`'${node.id}`, parentId ? `'${parentId}` : '', node.name || '', node.birth || '', node.death || '', node.note || '']);
+                rows.push([`'${node.id}`, parentId ? `'${parentId}` : '', node.name || '', node.birth || '', node.death || '', node.note || '', node.avatarUrl || '']);
                 (node.children || []).forEach(c => walk(c, node.id));
             })(data);
             await gapi.client.sheets.spreadsheets.values.update({
@@ -480,6 +483,18 @@ function updateSelectionActions() {
         const node = findById(data, highlightedNodeId);
         if (node) {
             $('#selection-name').textContent = 'Đang chọn: ' + node.name;
+            
+            const avatarEl = $('#selection-avatar');
+            if (node.avatarUrl) {
+                avatarEl.style.backgroundImage = `url(${node.avatarUrl})`;
+                avatarEl.innerHTML = '';
+            } else {
+                avatarEl.style.backgroundImage = 'none';
+                avatarEl.innerHTML = '&#43;';
+            }
+            
+            avatarEl.onclick = () => onEdit(node);
+
             panel.classList.remove('hidden');
         } else {
              panel.classList.add('hidden');
@@ -531,6 +546,15 @@ function updateInfoPanel(nodeId) {
 
     const name = node.name || 'N/A';
     $('#info-name').textContent = name;
+
+    const avatarContainer = $('#info-avatar');
+    if (node.avatarUrl) {
+        avatarContainer.style.backgroundImage = `url(${node.avatarUrl})`;
+        avatarContainer.style.display = 'block';
+    } else {
+        avatarContainer.style.backgroundImage = 'none';
+        avatarContainer.style.display = 'none';
+    }
 
     const giap = getGiap(node);
     const generation = node.depth + 1;
@@ -646,15 +670,49 @@ function updateMinimap() {
   })(data);
 }
 
+async function uploadImageToCloudinary(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
+    const saveBtn = $('#mSave');
+    const originalBtnText = saveBtn.textContent;
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Đang tải ảnh...';
+
+    const apiUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+
+    try {
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            body: formData,
+        });
+
+        if (!response.ok) {
+            throw new Error('Tải ảnh lên Cloudinary thất bại. Vui lòng thử lại.');
+        }
+
+        const data = await response.json();
+        return data.secure_url;
+    } catch (error) {
+        console.error('Lỗi Cloudinary:', error);
+        alert(error.message);
+        return null;
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = originalBtnText;
+    }
+}
+
 function openModal(title, init, onSave) {
-  const modal = $('#modal'), mTitle = $('#mTitle'), mName = $('#mName'), mBirth = $('#mBirth'), mDeath = $('#mDeath'), mNote = $('#mNote');
-  mTitle.textContent = title; mName.value = init?.name || ''; mBirth.value = init?.birth || ''; mDeath.value = init?.death || ''; mNote.value = init?.note || '';
+  const modal = $('#modal'), mTitle = $('#mTitle'), mName = $('#mName'), mBirth = $('#mBirth'), mDeath = $('#mDeath'), mNote = $('#mNote'), mAvatar = $('#mAvatar');
+  mTitle.textContent = title; mName.value = init?.name || ''; mBirth.value = init?.birth || ''; mDeath.value = init?.death || ''; mNote.value = init?.note || ''; mAvatar.value = init?.avatarUrl || '';
   modal.classList.add('show');
   const btnSave = $('#mSave'), btnCancel = $('#mCancel');
   function cleanup() { modal.classList.remove('show'); btnSave.removeEventListener('click', saveHandler); btnCancel.removeEventListener('click', close); modal.removeEventListener('click', outside); document.removeEventListener('keydown', esc); }
   function saveHandler() {
       const name = mName.value.trim(); if (!name) { mName.focus(); return; }
-      onSave({ name, birth: mBirth.value.trim(), death: mDeath.value.trim(), note: mNote.value.trim() }); cleanup();
+      onSave({ name, birth: mBirth.value.trim(), death: mDeath.value.trim(), note: mNote.value.trim(), avatarUrl: mAvatar.value.trim() }); cleanup();
   }
   function close() { cleanup(); } function outside(e) { if (e.target === modal) close(); } function esc(e) { if (e.key === 'Escape') close(); }
   btnSave.addEventListener('click', saveHandler); btnCancel.addEventListener('click', close); modal.addEventListener('click', outside); document.addEventListener('keydown', esc);
@@ -679,6 +737,10 @@ function onEdit(n) { if (!isOwner) return;
     updateLayout();
     scheduleRender(); 
   });
+  
+  const fileInput = $('#mAvatarFile');
+  fileInput.value = '';
+  fileInput.click();
 }
 function onDel(n) { if (!isOwner) return;
   const msg = data.id === n.id ? 'Xóa gốc sẽ xóa toàn bộ cây. Bạn chắc chứ?' : 'Xóa thành viên này và toàn bộ nhánh con?';
@@ -732,7 +794,7 @@ function fromCSV(text) {
             const id = values[idx('id')]; const parentId = values[idx('parentid')]; const name = values[idx('name')];
             if (!id && !parentId) return; if (!id) { console.error(`Lỗi Dòng ${index + 2}: "${name}" không có ID.`); hasError = true; return; }
             if (map.has(id)) { console.error(`Lỗi Dòng ${index + 2}: ID "${id}" trùng lặp.`); hasError = true; return; }
-            const node = { id, parentId, name: values[idx('name')], birth: values[idx('birth')], death: values[idx('death')], note: values[idx('note')], children: [] };
+            const node = { id, parentId, name: values[idx('name')], birth: values[idx('birth')], death: values[idx('death')], note: values[idx('note')], avatarUrl: values[idx('avatarurl')], children: [] };
             map.set(id, node); allNodes.push(node);
         } catch (e) { console.warn('Bỏ qua dòng CSV không hợp lệ:', line); }
     });
@@ -996,7 +1058,7 @@ async function loadInitialData() {
 async function loadTreeData(sheetName) {
     if (!sheetName) return; currentSheetName = sheetName; document.body.style.cursor = 'wait'; data = null; scheduleRender();
     try {
-        const response = await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${sheetName}!A:F`, });
+        const response = await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${sheetName}!A:G`, });
         const treeRows = response.result.values; if (treeRows && treeRows.length > 0) { const csvText = treeRows.map(row => row.join(',')).join('\n'); data = fromCSV(csvText); }
     } catch (e) { console.error(`Lỗi khi tải từ sheet "${sheetName}":`, e); alert(`Không thể tải phả đồ "${sheetName}".`); }
     finally {
@@ -1190,6 +1252,15 @@ function init() {
   $('#act-add-child').addEventListener('click', () => { if (highlightedNodeId) { const node = findById(data, highlightedNodeId); if (node) onAdd(node); } });
   $('#act-edit-node').addEventListener('click', () => { if (highlightedNodeId) { const node = findById(data, highlightedNodeId); if (node) onEdit(node); } });
   $('#act-delete-node').addEventListener('click', () => { if (highlightedNodeId) { const node = findById(data, highlightedNodeId); if (node) onDel(node); } });
+
+  $('#mAvatarFile').onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const imageUrl = await uploadImageToCloudinary(file);
+    if (imageUrl) {
+      $('#mAvatar').value = imageUrl;
+    }
+  };
 }
 
 function updateControlsUI() {
