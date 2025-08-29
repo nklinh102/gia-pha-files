@@ -319,7 +319,6 @@ function drawNode(node) {
     
     const name = node.name || 'Chưa đặt tên';
     let meta = '';
-    // **ĐIỂM THAY ĐỔI 1: Chỉ hiện năm sinh/mất cho Đời 1 (depth 0) và Đời 2 (depth 1)**
     if (node.depth < 2) { 
         meta = [node.birth || '', node.death ? `– ${node.death}` : ''].join(' ').trim();
     }
@@ -497,7 +496,8 @@ function updateSelectionActions() {
                 avatarEl.innerHTML = '&#43;';
             }
             
-            avatarEl.onclick = () => onEdit(node);
+            // **ĐIỂM THAY ĐỔI 4: Gán sự kiện onclick cho avatar**
+            avatarEl.onclick = () => onEditAvatar(node);
 
             panel.classList.remove('hidden');
         } else {
@@ -556,7 +556,6 @@ function updateInfoPanel(nodeId) {
         avatarContainer.style.backgroundImage = `url(${node.avatarUrl})`;
         avatarContainer.style.display = 'block';
     } else {
-        avatarContainer.style.backgroundImage = 'none';
         avatarContainer.style.display = 'none';
     }
 
@@ -749,6 +748,7 @@ function openConfirm(message, onYes) {
 function onAdd(n) { if (!isOwner) return;
   openModal('Thêm con cho ' + n.name, {}, (d) => { pushHistory(); if (!n.children) n.children = []; n.children.push({ id: generateHierarchicalId(n), ...d, children: [] }); setUnsavedChanges(true); updateLayout(); scheduleRender(); });
 }
+// **ĐIỂM THAY ĐỔI 3: Tách hàm onEdit**
 function onEdit(n) { if (!isOwner) return;
   openModal('Chỉnh sửa: ' + n.name, n, (d) => { 
     pushHistory(); 
@@ -757,10 +757,12 @@ function onEdit(n) { if (!isOwner) return;
     updateLayout();
     scheduleRender(); 
   });
-  
-  const fileInput = $('#mAvatarFile');
-  fileInput.value = '';
-  fileInput.click();
+}
+function onEditAvatar(n) { if (!isOwner) return;
+    onEdit(n); // Vẫn gọi onEdit để mở modal
+    const fileInput = $('#mAvatarFile');
+    fileInput.value = '';
+    fileInput.click();
 }
 function onDel(n) { if (!isOwner) return;
   const msg = data.id === n.id ? 'Xóa gốc sẽ xóa toàn bộ cây. Bạn chắc chứ?' : 'Xóa thành viên này và toàn bộ nhánh con?';
