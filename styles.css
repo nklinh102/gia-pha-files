@@ -235,7 +235,7 @@ font-size:11px; padding:.12rem .35rem; border:1px solid var(--border); border-ra
   display: flex; 
   align-items: flex-end; 
   gap: 8px;
-  pointer-events: none; /* Thêm dòng này */
+  pointer-events: none;
 }
 #bottom-right-ui > * {
   pointer-events: auto;
@@ -430,9 +430,8 @@ font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   color: var(--ink);
 }
 
-/* **ĐIỂM THAY ĐỔI 5: Tối ưu lại toàn bộ CSS cho bảng tin** */
 #info-panel {
-  position: relative; /* Đổi thành relative để làm gốc cho avatar */
+  position: absolute; /* Sửa lại thành absolute để định vị ở góc dưới */
   bottom: 20px;
   left: 20px;
   z-index: 10;
@@ -446,22 +445,29 @@ font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   visibility: hidden;
   pointer-events: none;
 }
+.info-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 8px;
+}
 #info-panel h3 {
+  flex-grow: 1;
   margin: 0;
   font-size: 15px;
   font-weight: bold;
   color: var(--accent);
   padding-bottom: 8px;
-  margin-bottom: 8px;
   border-bottom: 1px solid var(--border);
   white-space: normal;
   word-break: break-word;
-  /* Thêm khoảng trống bên phải để tên dài không bị avatar đè lên */
-  padding-right: 70px; 
 }
 .info-grid {
   display: grid;
   gap: 10px;
+  /* Thêm padding top để chữ không bị avatar che mất */
+  padding-top: 40px; 
 }
 .info-item {
   font-size: 13px;
@@ -569,10 +575,7 @@ font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   background-size: cover;
   background-position: center;
   border-style: solid;
-  /* Đặt avatar ở góc trên bên phải */
-  position: absolute;
-  top: 12px;
-  right: 12px;
+  flex-shrink: 0;
 }
 
 #selection-name-label {
