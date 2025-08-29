@@ -693,6 +693,7 @@ async function uploadImageToCloudinary(file) {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+    formData.append('folder', 'avatar');
 
     const saveBtn = $('#mSave');
     const originalBtnText = saveBtn.textContent;
