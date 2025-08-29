@@ -482,8 +482,8 @@ function updateSelectionActions() {
     if (highlightedNodeId && isOwner) {
         const node = findById(data, highlightedNodeId);
         if (node) {
-            $('#selection-name').textContent = 'Đang chọn: ' + node.name;
-            
+            $('#selection-name-value').textContent = node.name; // Chỉ cập nhật tên
+        
             const avatarEl = $('#selection-avatar');
             if (node.avatarUrl) {
                 avatarEl.style.backgroundImage = `url(${node.avatarUrl})`;
