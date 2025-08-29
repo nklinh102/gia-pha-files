@@ -139,13 +139,13 @@
           <canvas id='tree-canvas'></canvas>
           <img id='tree-decoration' src=''>
           <div class='panel hidden' id='selection-actions'>
-            <div class='selection-header'>
-                <div style="flex-grow: 1;">
-                    <h3 id='selection-name-label'>Đang chọn:</h3>
-                    <div id='selection-name-value'>No selection</div>
-                </div>
-                <div id='selection-avatar' title='Nhấn để sửa thông tin & ảnh'></div>
-            </div>
+              <div class='selection-header'>
+                  <div style="flex-grow: 1;">
+                      <h3 id='selection-name-label'>Đang chọn:</h3>
+                      <div id='selection-name-value'>No selection</div>
+                  </div>
+                  <div id='selection-avatar' title='Nhấn để sửa thông tin & ảnh'></div>
+              </div>
               <div class='actions-grid'>
                   <button class='btn' id='act-add-child'>
                       <svg fill='none' height='16' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' viewBox='0 0 24 24' width='16'><path d='M6 3v12'/><path d='M18 9v12'/><path d='M3 15h18'/><path d='M14 21v-5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v5'/></svg>
@@ -170,6 +170,14 @@
               <div class='info-item'>
                 <strong>Giáp / Đời:</strong>
                 <span id='info-generation'></span>
+              </div>
+              <div class='info-item inline-label' id='info-birth-item'>
+                <strong>Ngày sinh: </strong>
+                <span id='info-birth'></span>
+              </div>
+              <div class='info-item inline-label' id='info-death-item'>
+                <strong>Ngày mất: </strong>
+                <span id='info-death'></span>
               </div>
               <div class='info-item'>
                 <strong>Con cái:</strong>
@@ -275,4 +283,3 @@
     <script src="script.js" defer></script>
 </body>
 </html>
-
