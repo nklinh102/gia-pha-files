@@ -467,7 +467,7 @@ font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   display: grid;
   gap: 10px;
   /* Thêm padding top để chữ không bị avatar che mất */
-  padding-top: 40px; 
+  padding-top: 10px; 
 }
 .info-item {
   font-size: 13px;
