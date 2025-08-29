@@ -34,7 +34,7 @@ let decorationSettings = {
     size: 150,
     opacity: 1.0,
     distance: 85,
-    url: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgGs2llJQqAohvWvVkav2yBWhGqkwrxQ-JRaTUZhmgkd0u1FK2XEmZJcgKT1j_44UgFSDTpYkgxFID1V3uywcHa2yrjXVAu3vgTyJgmuLBZbqXn4W50ivWMcKNblEhBSwmXd-VkRBktN7cSdlrkrnYGkAEOYmDLohBBHj6BFyhyphenhyphenQaigmO8jxRDyzAbFwEs/s1600/Asset%201@4x.png'
+    url: 'https://cdn.jsdelivr.net/gh/nklinh102/gia-pha-files@main/images/Cuonthu.png'
 };
 
 let currentSheetName = '';
@@ -434,7 +434,7 @@ function updateNodeIcons() {
             if (!imgEl) {
                 imgEl = document.createElement('img');
                 imgEl.className = 'node-icon';
-                imgEl.src = 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjJlY9mZoOpmFHf5dgVWM9KdN0TjY5InAd2PC8-vRzvjIPTo9eXDqrrSkSPX3k8chiuQFksSRfdcbbFF9bzihTqKcKuFsNMht-rmYCPFJyJ41-sMhExQlFaurQyXxQ1TtIyblsHvysUXcYuwDSiqyTzcV9eT1oGI_drresKj-uuiEF6ak6CZJ9jghGedMo/s1600/Asset%202@4x.png';
+                imgEl.src = 'https://cdn.jsdelivr.net/gh/nklinh102/gia-pha-files@main/images/Khungten.png';
                 container.appendChild(imgEl);
                 domNodeIcons.set(node.id, imgEl);
             }
