@@ -139,7 +139,10 @@
           <canvas id='tree-canvas'></canvas>
           <img id='tree-decoration' src=''>
           <div class='panel hidden' id='selection-actions'>
-              <h3 id='selection-name'>No selection</h3>
+              <div class='selection-header'>
+                  <h3 id='selection-name'>No selection</h3>
+                  <div id='selection-avatar' title='Nhấn để sửa thông tin & ảnh'></div>
+              </div>
               <div class='actions-grid'>
                   <button class='btn' id='act-add-child'>
                       <svg fill='none' height='16' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' viewBox='0 0 24 24' width='16'><path d='M6 3v12'/><path d='M18 9v12'/><path d='M3 15h18'/><path d='M14 21v-5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v5'/></svg>
@@ -156,7 +159,10 @@
               </div>
           </div>
           <div class='panel hidden' id='info-panel'>
-            <h3 id='info-name'> </h3>
+            <div class='info-header'>
+                <h3 id='info-name'> </h3>
+                <div id='info-avatar'></div>
+            </div>
             <div class='info-grid'>
               <div class='info-item'>
                 <strong>Giáp / Đời:</strong>
@@ -222,21 +228,23 @@
 
     </div>
     <div class='modal' id='modal'>
-          <div class='dialog'>
-        <header><h3 id='mTitle'>Thêm thành viên</h3></header>
-        <div class='body'>
-          <label>Họ và tên<input id='mName' placeholder='Nguyễn Văn A' required=''></label>
-          <div style='display:grid;grid-template-columns:1fr 1fr;gap:8px'>
-            <label>Năm sinh<input id='mBirth' placeholder='VD: 1950, Canh Dần,...'></label>
-            <label>Năm mất<input id='mDeath' placeholder='VD: 2020, Canh Tý,...'></label>
-          </div>
-           <label>Ghi chú<textarea id='mNote' placeholder='Thông tin thêm...'></textarea></label>
+        <div class='dialog'>
+            <header><h3 id='mTitle'>Thêm thành viên</h3></header>
+            <input type="file" id="mAvatarFile" accept="image/png, image/jpeg, image/gif" style="display: none;">
+            <div class='body'>
+                <label>Họ và tên<input id='mName' placeholder='Nguyễn Văn A' required=''></label>
+                <div style='display:grid;grid-template-columns:1fr 1fr;gap:8px'>
+                    <label>Năm sinh<input id='mBirth' placeholder='VD: 1950, Canh Dần,...'></label>
+                    <label>Năm mất<input id='mDeath' placeholder='VD: 2020, Canh Tý,...'></label>
+                </div>
+                <label>Ghi chú<textarea id='mNote' placeholder='Thông tin thêm...'></textarea></label>
+                <label>URL Ảnh đại diện<input id='mAvatar' placeholder='Dán link ảnh hoặc để trống để tự tải lên...'></label>
+            </div>
+            <footer>
+                <button class='btn' id='mCancel'>Hủy</button>
+                <button class='btn' id='mSave'>Lưu</button>
+            </footer>
         </div>
-        <footer>
-          <button class='btn' id='mCancel'>Hủy</button>
-          <button class='btn' id='mSave'>Lưu</button>
-        </footer>
-      </div>
     </div>
     <div class='modal' id='confirm'>
       <div class='dialog'>
