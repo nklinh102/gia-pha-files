@@ -438,12 +438,20 @@ font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   width: 240px;
   padding: 12px;
   transition: transform .3s ease, opacity .3s ease, visibility .3s ease;
+  
+  /* Bố cục mới cho info panel */
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
 }
 #info-panel.hidden {
   transform: translateY(10px);
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
+}
+.info-text-content {
+  flex-grow: 1;
 }
 #info-panel h3 {
   margin: 0 0 12px;
@@ -452,9 +460,12 @@ font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   color: var(--accent);
   border-bottom: 1px solid var(--border);
   padding-bottom: 8px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  
+  /* Cho phép tên dài xuống dòng */
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  word-break: break-word;
 }
 .info-grid {
   display: grid;
@@ -526,9 +537,7 @@ font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
 /* --- CSS Thêm cho Avatar & Điều chỉnh tên thành viên --- */
-
-/* Bố cục cho phần header của panel */
-.selection-header, .info-header {
+.selection-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -536,7 +545,6 @@ font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   margin-bottom: 12px;
 }
 
-/* Kiểu chung cho avatar */
 #selection-avatar, #info-avatar {
   width: 60px;
   height: 60px;
@@ -548,13 +556,9 @@ font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   background-position: center;
   background-repeat: no-repeat;
 }
-
-/* Kiểu riêng cho avatar ở bảng Info (người xem) */
 #info-avatar {
   border-style: solid;
 }
-
-/* Kiểu riêng cho avatar ở bảng Actions (admin) */
 #selection-avatar {
   cursor: pointer;
   border-style: dashed;
@@ -565,31 +569,26 @@ font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   font-size: 24px;
   color: var(--muted);
 }
-
 #selection-avatar:hover {
   border-color: var(--accent);
   background-color: var(--bg);
 }
 
-/* Điều chỉnh lại layout của các panel */
-#info-panel .info-header h3 {
-  border-bottom: none;
-  padding-bottom: 0;
-}
-
-/* CSS cho khu vực hiển thị tên đang chọn */
 #selection-name-label {
     margin: 0;
     font-size: 13px;
-    font-weight: normal; /* Quan trọng: bỏ bôi đậm */
+    font-weight: normal;
     color: var(--muted);
 }
-
 #selection-name-value {
     font-size: 16px;
     font-weight: bold;
     color: var(--ink);
     margin-top: 2px;
-    white-space: normal; /* Cho phép tên dài xuống dòng */
-    word-break: break-word; /* Ngắt chữ nếu quá dài */
+    white-space: normal;
+    word-break: break-word;
+}
+.info-item.inline-label strong {
+    display: inline;
+    margin-bottom: 0;
 }
