@@ -658,3 +658,15 @@ font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   flex-shrink: 0;
   z-index: 2; /* Đảm bảo nút icon luôn nằm trên */
 }
+/* --- Tối ưu giao diện cho điện thoại --- */
+@media (max-width: 600px) {
+  #bottom-right-ui {
+    /* Đưa các nút về lại vị trí cuối cùng của màn hình */
+    align-items: flex-end; 
+  }
+
+  #minimap {
+    /* Ẩn bản đồ nhỏ trên điện thoại để giao diện gọn hơn */
+    display: none;
+  }
+}
