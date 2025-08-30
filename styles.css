@@ -624,7 +624,7 @@ font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 @media (max-width: 600px) {
   /* Sửa lỗi tiêu đề quá to */
   #app-header h1 {
-    font-size: 20px;
+    font-size: 15px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
