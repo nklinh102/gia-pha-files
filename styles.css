@@ -431,7 +431,7 @@ font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
 #info-panel {
-  position: absolute; /* Sửa lại thành absolute để định vị ở góc dưới */
+  position: absolute; 
   bottom: 20px;
   left: 20px;
   z-index: 10;
@@ -451,6 +451,8 @@ font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   align-items: flex-start;
   gap: 12px;
   margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
 }
 #info-panel h3 {
   flex-grow: 1;
@@ -458,15 +460,12 @@ font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   font-size: 15px;
   font-weight: bold;
   color: var(--accent);
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--border);
   white-space: normal;
   word-break: break-word;
 }
 .info-grid {
   display: grid;
   gap: 10px;
-  /* Thêm padding top để chữ không bị avatar che mất */
 }
 .info-item {
   font-size: 13px;
@@ -594,4 +593,65 @@ font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 .info-item.inline-label strong {
     display: inline;
     margin-bottom: 0;
+}
+
+/* --- CSS cho ô tìm kiếm mới --- */
+#search-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+#search-container #search {
+  width: 0;
+  opacity: 0;
+  visibility: hidden;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--ink);
+  border-radius: 17px; /* Cùng bán kính với nút icon */
+  padding: 8px 30px 8px 15px; /* Chừa không gian cho nút clear */
+  height: 34px;
+  transition: all .3s ease;
+  transform: translateX(10px);
+}
+
+#search-container.search-expanded #search {
+  width: 200px;
+  opacity: 1;
+  visibility: visible;
+  margin-right: 8px;
+  transform: translateX(0);
+}
+
+#search-container #btnClearSearch {
+  position: absolute;
+  right: 50px; /* Vị trí bên trong ô input */
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  display: none; /* Sẽ được điều khiển bởi JS */
+  padding: 0 8px;
+  font-size: 20px;
+  line-height: 1;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity .3s;
+}
+
+#search-container.search-expanded #btnClearSearch {
+  opacity: 1;
+}
+
+#search-container #btnToggleSearch {
+  /* Ghi đè lại một số style của .btn để đồng bộ */
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  padding: 5px;
+  flex-shrink: 0;
 }
