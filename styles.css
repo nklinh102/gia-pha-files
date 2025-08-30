@@ -630,3 +630,7 @@ font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     text-overflow: ellipsis;
   }
 }
+/* Quy tắc để ẩn minimap khi có class .hidden */
+#minimap.hidden {
+  display: none;
+}
