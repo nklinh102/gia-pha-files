@@ -198,16 +198,7 @@ align-items:center;
 gap:.5rem;}
 .toggle-wrapper.disabled { opacity: 0.5; pointer-events: none;
 }
-#minimap{position:relative; width:200px;height:150px;background:rgba(11,16,32,0.8);border:1px solid var(--border);border-radius:8px;overflow:hidden; transition: opacity 0.3s ease, transform 0.3s ease, visibility 0.3s;}
-[data-theme="light"] #minimap { background: rgba(255,255,255,0.8);
-}
-#minimap-canvas {
-    position: absolute;
-    top: 0;
-    left: 0;
-    transform-origin: 0 0;
-}
-#minimap-viewport{position:absolute;border:1px solid var(--accent);background:rgb(from var(--accent) r g b / 0.2);cursor:grab}
+
 .modal{position:fixed;inset:0;display:none;place-items:center;background:rgba(0,0,0,.45);z-index:20}
 .modal.show{display:grid}
 .dialog{width:min(560px,96vw);background:var(--panel);border:1px solid var(--border);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.5)}
@@ -245,8 +236,6 @@ font-size:11px; padding:.12rem .35rem; border:1px solid var(--border); border-ra
   align-items: center;
   gap: 8px;
 }
-#minimap { position: relative; bottom: auto; right: auto; }
-#minimap.hidden { display: none; }
 #bottom-right-ui .btn {
   width: 34px;
   height: 34px;
@@ -486,10 +475,19 @@ font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     font-weight: 500;
 }
 
+@media (max-width: 600px) {
+  #app-header h1 {
+    font-size: 20px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
 @media print {
   body { background: #fff; color: #000; }
   .app { display: block; height: auto; padding: 0; }
-  #app-header, .left, .topbar, #minimap, #bottom-right-ui, #overlay, .media-sidebar, #selection-actions, #info-panel { display: none; }
+  #app-header, .left, .topbar, #bottom-right-ui, #overlay, .media-sidebar, #selection-actions, #info-panel { display: none; }
   .panel.right { border: none; box-shadow: none; border-radius: 0; }
   .canvas-container { border-radius: 0; }
 }
@@ -619,18 +617,4 @@ font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   padding: 5px;
   flex-shrink: 0;
   z-index: 2; /* Đảm bảo nút icon luôn nằm trên */
-}
-/* --- Tối ưu giao diện cho điện thoại --- */
-@media (max-width: 600px) {
-  /* Sửa lỗi tiêu đề quá to */
-  #app-header h1 {
-    font-size: 12px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-}
-/* Quy tắc để ẩn minimap khi có class .hidden */
-#minimap.hidden {
-  display: none;
 }
