@@ -496,7 +496,6 @@ function updateSelectionActions() {
                 avatarEl.innerHTML = '&#43;';
             }
             
-            // **ĐIỂM THAY ĐỔI 4: Gán sự kiện onclick cho avatar**
             avatarEl.onclick = () => onEditAvatar(node);
 
             panel.classList.remove('hidden');
@@ -749,7 +748,6 @@ function openConfirm(message, onYes) {
 function onAdd(n) { if (!isOwner) return;
   openModal('Thêm con cho ' + n.name, {}, (d) => { pushHistory(); if (!n.children) n.children = []; n.children.push({ id: generateHierarchicalId(n), ...d, children: [] }); setUnsavedChanges(true); updateLayout(); scheduleRender(); });
 }
-// **ĐIỂM THAY ĐỔI 3: Tách hàm onEdit**
 function onEdit(n) { if (!isOwner) return;
   openModal('Chỉnh sửa: ' + n.name, n, (d) => { 
     pushHistory(); 
@@ -760,7 +758,7 @@ function onEdit(n) { if (!isOwner) return;
   });
 }
 function onEditAvatar(n) { if (!isOwner) return;
-    onEdit(n); // Vẫn gọi onEdit để mở modal
+    onEdit(n);
     const fileInput = $('#mAvatarFile');
     fileInput.value = '';
     fileInput.click();
@@ -1284,6 +1282,29 @@ function init() {
       $('#mAvatar').value = imageUrl;
     }
   };
+
+  const searchContainer = $('#search-container');
+  const btnToggleSearch = $('#btnToggleSearch');
+
+  btnToggleSearch.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isExpanded = searchContainer.classList.toggle('search-expanded');
+      if (isExpanded) {
+          searchInput.focus();
+      }
+  });
+  
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      searchContainer.classList.remove('search-expanded');
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!searchContainer.contains(e.target)) {
+      searchContainer.classList.remove('search-expanded');
+    }
+  });
 }
 
 function updateControlsUI() {
