@@ -233,7 +233,7 @@ font-size:11px; padding:.12rem .35rem; border:1px solid var(--border); border-ra
   right: 12px; 
   z-index: 10; 
   display: flex; 
-  align-items: flex-end; 
+  align-items: center; /* Đổi thành center để các nút thẳng hàng */
   gap: 8px;
   pointer-events: none;
 }
@@ -610,48 +610,51 @@ font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--ink);
-  border-radius: 17px; /* Cùng bán kính với nút icon */
-  padding: 8px 30px 8px 15px; /* Chừa không gian cho nút clear */
+  border-radius: 17px;
+  padding: 8px 35px 8px 15px; /* Chừa không gian cho nút clear */
   height: 34px;
   transition: all .3s ease;
   transform: translateX(10px);
+  padding-left: 15px;
 }
 
 #search-container.search-expanded #search {
   width: 200px;
   opacity: 1;
   visibility: visible;
-  margin-right: 8px;
+  margin-right: -34px; /* Dịch vào trong để nút icon nằm đè lên */
   transform: translateX(0);
 }
 
 #search-container #btnClearSearch {
   position: absolute;
-  right: 50px; /* Vị trí bên trong ô input */
+  right: 45px;
   top: 50%;
   transform: translateY(-50%);
   border: none;
   background: transparent;
   color: var(--muted);
   cursor: pointer;
-  display: none; /* Sẽ được điều khiển bởi JS */
+  display: none;
   padding: 0 8px;
   font-size: 20px;
   line-height: 1;
   z-index: 1;
   opacity: 0;
   transition: opacity .3s;
+  pointer-events: none;
 }
 
 #search-container.search-expanded #btnClearSearch {
   opacity: 1;
+  pointer-events: auto;
 }
 
 #search-container #btnToggleSearch {
-  /* Ghi đè lại một số style của .btn để đồng bộ */
   width: 34px;
   height: 34px;
   border-radius: 50%;
   padding: 5px;
   flex-shrink: 0;
+  z-index: 2; /* Đảm bảo nút icon luôn nằm trên */
 }
