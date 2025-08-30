@@ -90,7 +90,7 @@ width: 40px; height: 40px; padding: 8px; background: transparent; border: 1px so
 .app {
     display: block;
     height: calc(100vh - var(--header-height));
-    padding: 12px;
+    padding: 5px;
     gap: 12px;
 }
 .right {
