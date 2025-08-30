@@ -70,7 +70,6 @@ const canvasContainer = $('#canvas-container');
 const treeCanvas = $('#tree-canvas');
 const treeDecoration = $('#tree-decoration');
 const ctx = treeCanvas.getContext('2d');
-const minimap = $('#minimap'), minimapCanvas = $('#minimap-canvas'), minimapViewport = $('#minimap-viewport');
 const authContainer = $('#auth-container');
 const treeSelector = $('#tree-selector');
 
@@ -236,7 +235,6 @@ function render() {
         ctx.fillText("Không có dữ liệu gia phả.", treeCanvas.width / 2, treeCanvas.height / 2);
         ctx.restore();
         updateStats();
-        updateMinimap();
         updateNodeIcons();
         return;
     }
@@ -250,7 +248,6 @@ function render() {
     ctx.restore(); 
 
     updateNodeIcons();
-    updateMinimap();
     updateDecoration();
     updateStats();
 }
@@ -657,35 +654,6 @@ function updateStats() {
   counts.forEach((count, index) => { html += `<div><span>Đời ${index + 1}</span> <strong>${count}</strong></div>`; total += count; });
   html += `<div class="total-row"><span><strong>Tổng cộng</strong></span> <strong>${total}</strong></div>`;
   statsContainer.innerHTML = html;
-}
-function updateMinimap() {
-  if (!data || !canvasContainer.getBoundingClientRect().width) { minimap.style.display = 'none'; return; }
-  minimap.style.display = 'block';
-  const canvasRect = canvasContainer.getBoundingClientRect();
-  const mapRect = minimap.getBoundingClientRect();
-  const mapScale = Math.min(mapRect.width / treeSize.w, mapRect.height / treeSize.h);
-  
-  minimapViewport.style.left = (-panX * mapScale) + 'px';
-  minimapViewport.style.top = (-panY * mapScale) + 'px';
-  minimapViewport.style.width = (canvasRect.width / scale * mapScale) + 'px';
-  minimapViewport.style.height = (canvasRect.height / scale * mapScale) + 'px';
-
-  const ctxMinimap = minimapCanvas.getContext('2d');
-  const mapCanvasWidth = treeSize.w * mapScale;
-  const mapCanvasHeight = treeSize.h * mapScale;
-  minimapCanvas.width = mapCanvasWidth;
-  minimapCanvas.height = mapCanvasHeight;
-  ctxMinimap.clearRect(0, 0, mapCanvasWidth, mapCanvasHeight);
-  ctxMinimap.fillStyle = getCssVar('--muted');
-  (function walk(n) {
-      if (!n || !n._x) return;
-      const rectX = (n._x - n._w / 2) * mapScale;
-      const rectY = (n._y - n._h / 2) * mapScale;
-      const rectW = n._w * mapScale;
-      const rectH = n._h * mapScale;
-      ctxMinimap.fillRect(rectX, rectY, rectW, rectH);
-      (n.children || []).forEach(walk);
-  })(data);
 }
 
 async function uploadImageToCloudinary(file) {
@@ -1189,13 +1157,29 @@ function init() {
   const toggleSidebar = () => app.classList.toggle('sidebar-collapsed');
   $('#btnToggleSidebar').onclick = toggleSidebar;
 
-  const minimapEl = $('#minimap');
-  const btnToggleMinimap = $('#btnToggleMinimap');
-  if (localStorage.getItem(LS_KEY_PREFIX + 'minimap') === 'hidden') minimapEl.classList.add('hidden');
-  btnToggleMinimap.addEventListener('click', () => {
-      minimapEl.classList.toggle('hidden');
-      localStorage.setItem(LS_KEY_PREFIX + 'minimap', minimapEl.classList.contains('hidden') ? 'hidden' : 'visible');
+  const searchContainer = $('#search-container');
+  const btnToggleSearch = $('#btnToggleSearch');
+
+  btnToggleSearch.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isExpanded = searchContainer.classList.toggle('search-expanded');
+      if (isExpanded) {
+          searchInput.focus();
+      }
   });
+  
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      searchContainer.classList.remove('search-expanded');
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!searchContainer.contains(e.target)) {
+      searchContainer.classList.remove('search-expanded');
+    }
+  });
+
   
   $('#gapXSlider').addEventListener('input', (e) => {
       gapX = parseInt(e.target.value, 10);
@@ -1283,28 +1267,6 @@ function init() {
     }
   };
 
-  const searchContainer = $('#search-container');
-  const btnToggleSearch = $('#btnToggleSearch');
-
-  btnToggleSearch.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const isExpanded = searchContainer.classList.toggle('search-expanded');
-      if (isExpanded) {
-          searchInput.focus();
-      }
-  });
-  
-  searchInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      searchContainer.classList.remove('search-expanded');
-    }
-  });
-
-  document.addEventListener('click', (e) => {
-    if (!searchContainer.contains(e.target)) {
-      searchContainer.classList.remove('search-expanded');
-    }
-  });
 }
 
 function updateControlsUI() {
