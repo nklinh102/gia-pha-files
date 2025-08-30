@@ -233,16 +233,20 @@ font-size:11px; padding:.12rem .35rem; border:1px solid var(--border); border-ra
   right: 12px; 
   z-index: 10; 
   display: flex; 
-  align-items: center; /* Đổi thành center để các nút thẳng hàng */
-  gap: 8px;
+  align-items: flex-end;
+  gap: 4px;
   pointer-events: none;
 }
 #bottom-right-ui > * {
   pointer-events: auto;
 }
+.button-group-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 #minimap { position: relative; bottom: auto; right: auto; }
-#minimap.hidden { opacity: 0;
-visibility: hidden; transform: translateX(10px); pointer-events: none; }
+#minimap.hidden { display: none; }
 #bottom-right-ui .btn {
   width: 34px;
   height: 34px;
@@ -483,44 +487,8 @@ font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
 @media (max-width: 600px) {
-  .app {
-    padding: 8px;
-  }
-  .left {
-    width: min(85vw, 300px); 
-  }
-  #app-header {
-    padding: 0 8px;
-  }
-  #app-header h1 {
-    font-size: 16px;
-    margin: 0 8px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  #tree-selector-wrapper {
-    margin: 0;
-  }
-  #tree-selector, .custom-select-trigger {
-    padding: 6px 8px;
-    font-size: 13px;
-    min-width: 0;
-    max-width: 110px;
-  }
-  #selection-actions {
-    width: 160px;
-    bottom: 10px;
-    left: 10px;
-  }
-  #selection-actions .btn {
-    font-size: 12px;
-    padding: 8px 10px;
-  }
-  #info-panel {
-    width: 180px;
-    bottom: 10px;
-    left: 10px;
+  #minimap {
+    display: none;
   }
 }
 
@@ -610,7 +578,7 @@ font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--ink);
-  border-radius: 17px;
+  border-radius: 17px; /* Cùng bán kính với nút icon */
   padding: 8px 35px 8px 15px; /* Chừa không gian cho nút clear */
   height: 34px;
   transition: all .3s ease;
@@ -657,16 +625,4 @@ font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   padding: 5px;
   flex-shrink: 0;
   z-index: 2; /* Đảm bảo nút icon luôn nằm trên */
-}
-/* --- Tối ưu giao diện cho điện thoại --- */
-@media (max-width: 600px) {
-  #bottom-right-ui {
-    /* Đưa các nút về lại vị trí cuối cùng của màn hình */
-    align-items: flex-end; 
-  }
-
-  #minimap {
-    /* Ẩn bản đồ nhỏ trên điện thoại để giao diện gọn hơn */
-    display: none;
-  }
 }
