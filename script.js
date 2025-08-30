@@ -27,7 +27,7 @@ const GEN345_W = 200, GEN345_H = 72;
 const GEN6PLUS_W = 60, GEN6PLUS_H = 180;
 const VERTICAL_THRESHOLD = 5;
 let gapX = 40;
-const DEFAULT_GAP_Y = 140;
+const DEFAULT_GAP_Y = 80;
 
 const MIN_QUERY = 2;
 const SEARCH_DEBOUNCE = 450;
