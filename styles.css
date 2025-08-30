@@ -477,10 +477,10 @@ font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 
 @media (max-width: 600px) {
   #app-header h1 {
-    font-size: 20px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    font-size: 16px; /* Giảm kích thước chữ thêm một chút */
+    white-space: normal; /* Cho phép chữ tự động xuống dòng */
+    line-height: 1.2; /* Điều chỉnh khoảng cách dòng cho đẹp mắt */
+    margin: 0 8px; /* Thêm một chút khoảng cách hai bên */
   }
 }
 
