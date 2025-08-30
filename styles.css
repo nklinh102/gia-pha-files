@@ -486,12 +486,6 @@ font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     font-weight: 500;
 }
 
-@media (max-width: 600px) {
-    #minimap {
-        display: none !important; /* Luôn ẩn trên mobile */
-    }
-}
-
 @media print {
   body { background: #fff; color: #000; }
   .app { display: block; height: auto; padding: 0; }
@@ -625,4 +619,14 @@ font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   padding: 5px;
   flex-shrink: 0;
   z-index: 2; /* Đảm bảo nút icon luôn nằm trên */
+}
+/* --- Tối ưu giao diện cho điện thoại --- */
+@media (max-width: 600px) {
+  /* Sửa lỗi tiêu đề quá to */
+  #app-header h1 {
+    font-size: 20px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }
