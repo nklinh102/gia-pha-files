@@ -234,7 +234,7 @@ font-size:11px; padding:.12rem .35rem; border:1px solid var(--border); border-ra
   z-index: 10; 
   display: flex; 
   align-items: flex-end;
-  gap: 4px;
+  gap: 8px;
   pointer-events: none;
 }
 #bottom-right-ui > * {
@@ -487,9 +487,9 @@ font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
 @media (max-width: 600px) {
-  #minimap {
-    display: none;
-  }
+    #minimap {
+        display: none !important; /* Luôn ẩn trên mobile */
+    }
 }
 
 @media print {
