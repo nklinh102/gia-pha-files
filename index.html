@@ -55,15 +55,7 @@
           <button class='btn owner-only-field' id='btnReset'>Xóa sạch</button>
         </div>
         <div class='scroll'>
-      
-            <div class='field' style='padding: 0 12px;'>
-                <label>Tìm kiếm (Nhấn Enter để di chuyển tới)</label>
-                <div style='position: relative; display: flex; align-items: center;'>
-                    <input id='search' placeholder='Nhập tên để tìm...' style='width: 100%;'>
-                    <button id='btnClearSearch' style='position: absolute; right: 2px; top: 50%; transform: translateY(-50%); border: none; background: transparent; color: var(--muted); cursor: pointer; display: none; padding: 0 12px; font-size: 20px; line-height: 1;' title='Xóa tìm kiếm'>&#215;</button>
-                </div>
-            </div>
-          
+               
           <div class='field owner-only-field' style='padding: 0 12px;'>
             <label>URL Ảnh nền</label>
             <div class='btn-group'>
@@ -198,6 +190,13 @@
             <canvas id='minimap-canvas'></canvas>
             <div id='minimap-viewport'></div>
           </div>
+              <div id="search-container">
+                  <input id='search' placeholder='Nhập tên để tìm...'>
+                  <button id='btnClearSearch' title='Xóa tìm kiếm'>&#215;</button>
+                  <button class='btn' id='btnToggleSearch' title='Tìm kiếm'>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                  </button>
+              </div>
           	  <button class='btn' id='btnFit' title='Vừa với màn hình'>
                 <svg fill='none' height='24' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' viewBox='0 0 24 24' width='24' xmlns='http://www.w3.org/2000/svg'><path d='M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3'/></svg>
               </button>
@@ -285,3 +284,4 @@
     <script src="script.js" defer></script>
 </body>
 </html>
+
