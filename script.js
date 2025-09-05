@@ -596,6 +596,14 @@ function updateInfoPanel(nodeId) {
     } else {
         deathItem.style.display = 'none';
     }
+    
+    // Gán sự kiện click cho nút đề xuất
+    const proposeChildBtn = $('#propose-child-btn');
+    if (proposeChildBtn) {
+        proposeChildBtn.onclick = () => {
+            onProposeMember(node.id);
+        };
+    }
 
     panel.classList.remove('hidden');
 }
@@ -700,8 +708,10 @@ async function uploadImageToCloudinary(file) {
 
 function openModal(title, init, onSave) {
   const modal = $('#modal'), mTitle = $('#mTitle'), mName = $('#mName'), mBirth = $('#mBirth'), mDeath = $('#mDeath'), mNote = $('#mNote'), mAvatar = $('#mAvatar'), mParentId = $('#mParentId');
-  mTitle.textContent = title; mName.value = init?.name || ''; mBirth.value = init?.birth || ''; mDeath.value = init?.death || ''; mNote.value = init?.note || ''; mAvatar.value = init?.avatarUrl || ''; mParentId.value = init?.parentId || '';
-  if (isOwner) mParentId.parentElement.style.display = 'flex'; else mParentId.parentElement.style.display = 'none';
+  mTitle.textContent = title; mName.value = init?.name || ''; mBirth.value = init?.birth || ''; mDeath.value = init?.death || ''; mNote.value = init?.note || ''; mAvatar.value = init?.avatarUrl || ''; 
+  
+  mParentId.parentElement.style.display = 'flex';
+  mParentId.value = init?.parentId || ''; // Tự động điền parentId
 
   modal.classList.add('show');
   const btnSave = $('#mSave'), btnCancel = $('#mCancel');
@@ -723,7 +733,7 @@ function openConfirm(message, onYes) {
   yes.addEventListener('click', on); no.addEventListener('click', off); c.addEventListener('click', outside); document.addEventListener('keydown', esc);
 }
 function onAdd(n) { if (!isOwner) return;
-  openModal('Thêm con cho ' + n.name, {}, (d) => { pushHistory(); if (!n.children) n.children = []; n.children.push({ id: generateHierarchicalId(n), ...d, children: [] }); setUnsavedChanges(true); updateLayout(); scheduleRender(); });
+  openModal('Thêm con cho ' + n.name, { parentId: n.id }, (d) => { pushHistory(); if (!n.children) n.children = []; n.children.push({ id: generateHierarchicalId(n), ...d, children: [] }); setUnsavedChanges(true); updateLayout(); scheduleRender(); });
 }
 function onEdit(n) { if (!isOwner) return;
   openModal('Chỉnh sửa: ' + n.name, n, (d) => { 
@@ -754,8 +764,8 @@ function onDel(n) { if (!isOwner) return;
     scheduleRender();
   });
 }
-async function onProposeMember() {
-    openModal('Đề xuất thêm thành viên', {}, async (d) => {
+async function onProposeMember(prefilledParentId = null) {
+    openModal('Đề xuất thêm thành viên', { parentId: prefilledParentId }, async (d) => {
         if (!d.name || !d.parentId) { alert('Vui lòng nhập Tên và ID của cha/mẹ.'); return; }
         const proposedData = [['', `'${d.parentId}`, d.name, d.birth, d.death, d.note, d.avatarUrl]];
         try {
@@ -1398,6 +1408,14 @@ function init() {
       $('#mAvatar').value = imageUrl;
     }
   };
+
+  // Gán sự kiện click cho nút đề xuất trong bảng điều khiển chính
+  const btnProposeMember = $('#btnProposeMember');
+  if (btnProposeMember) {
+      btnProposeMember.onclick = () => {
+          onProposeMember();
+      };
+  }
 }
 
 function updateControlsUI() {
