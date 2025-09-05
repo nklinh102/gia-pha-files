@@ -596,14 +596,6 @@ function updateInfoPanel(nodeId) {
     } else {
         deathItem.style.display = 'none';
     }
-    
-    // Gán sự kiện click cho nút đề xuất
-    const proposeChildBtn = $('#propose-child-btn');
-    if (proposeChildBtn) {
-        proposeChildBtn.onclick = () => {
-            onProposeMember(node.id);
-        };
-    }
 
     panel.classList.remove('hidden');
 }
@@ -1409,12 +1401,23 @@ function init() {
     }
   };
 
-  // Gán sự kiện click cho nút đề xuất trong bảng điều khiển chính
   const btnProposeMember = $('#btnProposeMember');
   if (btnProposeMember) {
       btnProposeMember.onclick = () => {
           onProposeMember();
       };
+  }
+  
+  const proposeChildBtn = $('#propose-child-btn');
+  if (proposeChildBtn) {
+      proposeChildBtn.addEventListener('click', () => {
+          if (highlightedNodeId) {
+              const node = findById(data, highlightedNodeId);
+              if (node) {
+                  onProposeMember(node.id);
+              }
+          }
+      });
   }
 }
 
