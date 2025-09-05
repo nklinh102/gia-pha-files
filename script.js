@@ -759,7 +759,7 @@ function onDel(n) { if (!isOwner) return;
 async function onProposeMember(prefilledParentId = null) {
     openModal('Đề xuất thêm thành viên', { parentId: prefilledParentId }, async (d) => {
         if (!d.name || !d.parentId) { alert('Vui lòng nhập Tên và ID của cha/mẹ.'); return; }
-        const proposedData = [['', `'${d.parentId}`, d.name, d.birth, d.death, d.note, d.avatarUrl]];
+        const proposedData = [['', d.parentId, d.name, d.birth, d.death, d.note, d.avatarUrl]];
         try {
             await gapi.client.sheets.spreadsheets.values.append({
                 spreadsheetId: SPREADSHEET_ID,
