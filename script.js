@@ -703,7 +703,12 @@ function openModal(title, init, onSave) {
   const modal = $('#modal'), mTitle = $('#mTitle'), mName = $('#mName'), mBirth = $('#mBirth'), mDeath = $('#mDeath'), mNote = $('#mNote'), mAvatar = $('#mAvatar'), mParentId = $('#mParentId');
   mTitle.textContent = title; mName.value = init?.name || ''; mBirth.value = init?.birth || ''; mDeath.value = init?.death || ''; mNote.value = init?.note || ''; mAvatar.value = init?.avatarUrl || '';
   
-  mParentId.parentElement.style.display = 'flex';
+  // Chỉ hiển thị trường Parent ID cho admin
+  if (isOwner) {
+    mParentId.parentElement.style.display = 'flex';
+  } else {
+    mParentId.parentElement.style.display = 'none';
+  }
   mParentId.value = init?.parentId || ''; // Tự động điền parentId
 
   modal.classList.add('show');
@@ -757,11 +762,8 @@ function onDel(n) { if (!isOwner) return;
     scheduleRender();
   });
 }
+
 async function onProposeMember(prefilledParentId = null) {
-    if (!gapi.auth.getToken()) {
-        alert('Vui lòng đăng nhập để gửi đề xuất.');
-        return;
-    }
     openModal('Đề xuất thêm thành viên', { parentId: prefilledParentId }, async (d) => {
         if (!d.name || !d.parentId) {
             alert('Vui lòng nhập Tên và ID của cha/mẹ.');
@@ -1407,7 +1409,6 @@ function init() {
           }
       });
   }
-
 }
 
 function updateControlsUI() {
@@ -1419,7 +1420,7 @@ function updateControlsUI() {
         decorationSizeSlider.value = decorationSettings.size;
         decorationSizeLabel.textContent = decorationSettings.size;
         decorationDistanceSlider.value = decorationSettings.distance;
-        decorationDistanceLabel.textContent = decorationSettings.distance;
+        decorationDistanceLabel.textContent = decorationDistanceSettings.distance;
         decorationUrlInput.value = decorationSettings.url;
     }
 }
