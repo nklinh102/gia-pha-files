@@ -701,9 +701,8 @@ async function uploadImageToCloudinary(file) {
 
 function openModal(title, init, onSave) {
   const modal = $('#modal'), mTitle = $('#mTitle'), mName = $('#mName'), mBirth = $('#mBirth'), mDeath = $('#mDeath'), mNote = $('#mNote'), mAvatar = $('#mAvatar'), mParentId = $('#mParentId');
-  mTitle.textContent = title; mName.value = init?.name || ''; mBirth.value = init?.birth || ''; mDeath.value = init?.death || ''; mNote.value = init?.note || ''; mAvatar.value = init?.avatarUrl || ''; 
+  mTitle.textContent = title; mName.value = init?.name || ''; mBirth.value = init?.birth || ''; mDeath.value = init?.death || ''; mNote.value = init?.note || ''; mAvatar.value = init?.avatarUrl || '';
   
-  // Hiển thị trường Parent ID cho tất cả mọi người (kể cả người dùng không phải admin)
   mParentId.parentElement.style.display = 'flex';
   mParentId.value = init?.parentId || ''; // Tự động điền parentId
 
@@ -773,7 +772,7 @@ async function onProposeMember(prefilledParentId = null) {
         
         try {
             await gapi.client.sheets.spreadsheets.values.append({
-                spreadsheetId: SPREADSHEET_ID,
+                spreadsheetId: SUBMISSION_SHEET_ID,
                 range: `${PENDING_SHEET_NAME}!A1`,
                 valueInputOption: 'USER_ENTERED',
                 resource: { values: proposedData }
@@ -790,7 +789,7 @@ async function loadPendingProposals() {
     if (!isOwner) return;
     try {
         const response = await gapi.client.sheets.spreadsheets.values.get({
-            spreadsheetId: SPREADSHEET_ID,
+            spreadsheetId: SUBMISSION_SHEET_ID,
             range: `${PENDING_SHEET_NAME}!A:G`
         });
         const rows = response.result.values || [];
@@ -862,7 +861,7 @@ async function handlePendingAction(e) {
             updateLayout();
             scheduleRender();
             await gapi.client.sheets.spreadsheets.values.batchClear({
-                spreadsheetId: SPREADSHEET_ID,
+                spreadsheetId: SUBMISSION_SHEET_ID,
                 ranges: [`${PENDING_SHEET_NAME}!A${index + 2}:G${index + 2}`]
             });
             await loadPendingProposals();
@@ -871,7 +870,7 @@ async function handlePendingAction(e) {
         }
     } else if (action === 'reject') {
         await gapi.client.sheets.spreadsheets.values.batchClear({
-            spreadsheetId: SPREADSHEET_ID,
+            spreadsheetId: SUBMISSION_SHEET_ID,
             ranges: [`${PENDING_SHEET_NAME}!A${index + 2}:G${index + 2}`]
         });
         await loadPendingProposals();
@@ -1044,7 +1043,7 @@ function applySearch(shouldCenter) {
   const q = norm(searchInput.value || '');
   let first = null;
   nodesFlat.forEach(n => {
-    m = !!(n._norm && n._norm.includes(q));
+    const m = !!(n._norm && n._norm.includes(q));
     n.isSearchMatch = m;
     n.isSearchFocus = false;
     if (m && !first) {
@@ -1137,7 +1136,13 @@ async function loadUserInfo() {
     } else { isOwner = false; authContainer.innerHTML = `Xin chào, <b>${profile.name}</b> (Chế độ xem)<br/><button id="signout-button" class="btn" style="width:100%; margin-top: 8px;">Đăng xuất</button>`; $('#signout-button').onclick = handleSignoutClick; disableEditing(); }
     loadInitialData();
 }
-function updateAuthUI() { if (!isOwner) { authContainer.innerHTML = `<button id="signin-button" class="btn" style="width:100%">Đăng nhập để chỉnh sửa</button>`; $('#signin-button').onclick = handleAuthClick; } }
+function updateAuthUI() { 
+    if (!isOwner) { 
+        authContainer.innerHTML = `<button id="signin-button" class="btn" style="width:100%">Đăng nhập để chỉnh sửa</button>`; 
+        $('#signin-button').onclick = handleAuthClick; 
+    } 
+    pendingProposalsBtn.style.display = isOwner ? 'flex' : 'none';
+}
 async function loadInitialData() {
     if (!gapiInited) return; let sheetData;
     try {
@@ -1175,6 +1180,7 @@ async function loadInitialData() {
         const errorMsg = e?.result?.error?.message || e.message || 'Lỗi không xác định.';
         alert('Không thể tải dữ liệu. Chi tiết: ' + errorMsg); data = null; scheduleRender();
     }
+    await loadPendingProposals();
 }
 async function loadTreeData(sheetName) {
     if (!sheetName) return; currentSheetName = sheetName; document.body.style.cursor = 'wait'; data = null; scheduleRender();
@@ -1196,7 +1202,7 @@ async function saveSettingsToSheet() {
     if (!isOwner) return; const bgUrl = $('#bgUrlInput').value.trim(); const currentGapX = $('#gapXSlider').value; const newTitle = appTitle.textContent.trim();
     try {
         await gapi.client.sheets.spreadsheets.values.update({
-            spreadsheetId: SPREADSHEET_ID, range: `${SETTINGS_SHEET_NAME}!A1:B7`, valueInputOption: 'USER-ENTERED',
+            spreadsheetId: SPREADSHEET_ID, range: `${SETTINGS_SHEET_NAME}!A1:B7`, valueInputOption: 'USER_ENTERED',
             resource: { values: [ ['bg_url', bgUrl], ['gap_x', currentGapX], ['tree_title', newTitle], ['decoration_visible', decorationSettings.visible], ['decoration_size', decorationSettings.size], ['decoration_distance', decorationSettings.distance], ['decoration_url', decorationSettings.url] ] }
         });
     } catch(err) { console.error("Lỗi khi lưu cài đặt:", err); }
@@ -1347,7 +1353,7 @@ function init() {
   hammer.on('panmove', (e) => { panX = startPanX + e.deltaX; panY = startPanY + e.deltaY; scheduleRender(); });
   hammer.on('pinchstart', (e) => { startScale = scale; });
   hammer.on('pinchmove', (e) => {
-      const newScale = clamp(startScale * e.scale, 0.1, 5); const rect = treeCanvas.getBoundingClientRect();
+      const newScale = clamp(startScale * e.scale, 0.1, 5); const rect = canvasContainer.getBoundingClientRect();
       const pX = e.center.x - rect.left, pY = e.center.y - rect.top;
       const wX = (pX - panX) / scale, wY = (pY - panY) / scale;
       panX = pX - wX * newScale; panY = pY - wY * newScale; scale = newScale;
