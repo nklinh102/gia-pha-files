@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Sơ Đồ Gia Phả</title>
-    <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-KGNNHQJWD1"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
@@ -51,6 +50,9 @@
           <h1>Bảng điều khiển</h1>
           <div class='sub'>Tùy chỉnh và quản lý sơ đồ</div>
           <div id='auth-container' style='padding-top: 10px; font-size: 13px;'></div>
+          <div class="owner-only-field pending-proposals" id="pendingProposals">
+            <span id="pendingCount">0</span> đề xuất đang chờ duyệt
+          </div>
         </header>
         <div class='toolbar'>
           <button class='btn owner-only-field' disabled='true' id='btnSaveChanges' style='grid-column: 1 / -1; background: var(--accent); color: white;'>Lưu Thay Đổi</button>
@@ -249,6 +251,7 @@
             <input type="file" id="mAvatarFile" accept="image/png, image/jpeg, image/gif" style="display: none;">
             <div class='body'>
                 <label>Họ và tên<input id='mName' placeholder='Nguyễn Văn A' required=''></label>
+                <label class="owner-only-field">Là con của (Parent ID)<input id='mParentId' placeholder='ID của thành viên cha/mẹ'></label>
                 <div style='display:grid;grid-template-columns:1fr 1fr;gap:8px'>
                     <label>Năm sinh<input id='mBirth' placeholder='VD: 1950, Canh Dần,...'></label>
                     <label>Năm mất<input id='mDeath' placeholder='VD: 2020, Canh Tý,...'></label>
@@ -283,13 +286,19 @@
              </div>
       </div>
     </div>
+    <div class='modal' id='pending-modal'>
+      <div class='dialog' style='width:min(600px,96vw)'>
+        <header style='display:flex; justify-content:space-between; align-items:center;'>
+          <h3>Đề xuất đang chờ duyệt</h3>
+          <button class='btn' id='btnClosePending' style='padding: 6px 10px;'>&#215;</button>
+        </header>
+        <div class='body scroll-y' id='pending-content'>
+          <ul class="pending-list" id="pendingList"></ul>
+        </div>
+      </div>
+    </div>
     <audio id='global-audio-player'></audio>
 
     <script src="script.js" defer></script>
 </body>
 </html>
-
-
-
-
-
