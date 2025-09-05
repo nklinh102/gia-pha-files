@@ -1374,7 +1374,12 @@ function init() {
   updateControlsUI();
   $('#toggleDecoration').onchange = (e) => { decorationSettings.visible = e.target.checked; setUnsavedChanges(true); scheduleRender(); };
   decorationSizeSlider.addEventListener('input', (e) => { decorationSettings.size = parseInt(e.target.value, 10); decorationSizeLabel.textContent = decorationSettings.size; setUnsavedChanges(true); scheduleRender(); });
-  decorationDistanceSlider.addEventListener('input', (e) => { decorationSettings.distance = parseInt(e.target.value, 10); decorationDistanceLabel.textContent = decorationSettings.distance; setUnsavedChanges(true); scheduleRender(); });
+  decorationDistanceSlider.addEventListener('input', (e) => {
+    decorationSettings.distance = parseInt(e.target.value, 10);
+    decorationDistanceLabel.textContent = decorationSettings.distance; // Sửa lỗi ở đây
+    setUnsavedChanges(true);
+    scheduleRender();
+  });
   $('#decorationUrlInput').addEventListener('input', (e) => { 
     decorationSettings.url = e.target.value; 
     treeDecoration.src = e.target.value;
