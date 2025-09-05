@@ -11,6 +11,7 @@ const ADMIN_EMAIL = 'nklinh102@gmail.com';
 const INDEX_SHEET_NAME = '_index';
 const SETTINGS_SHEET_NAME = 'settings';
 const MEDIA_SHEET_NAME = 'Media';
+const PENDING_SHEET_NAME = 'PendingMembers'; // Tên sheet mới
 
 // ===================================================================
 
@@ -60,6 +61,8 @@ let domNodeIcons = new Map();
 let nodesFlat = [];
 let panAnimId = null;
 
+let pendingProposals = [];
+
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 const app = $('.app');
@@ -72,6 +75,10 @@ const treeDecoration = $('#tree-decoration');
 const ctx = treeCanvas.getContext('2d');
 const authContainer = $('#auth-container');
 const treeSelector = $('#tree-selector');
+const pendingModal = $('#pending-modal');
+const pendingList = $('#pendingList');
+const pendingProposalsBtn = $('#pendingProposals');
+const pendingCountSpan = $('#pendingCount');
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const norm = s => (s||'').normalize('NFD').replace(/\p{M}/gu,'').toLowerCase();
@@ -105,7 +112,7 @@ async function saveTreeData() {
                 (node.children || []).forEach(c => walk(c, node.id));
             })(data);
             await gapi.client.sheets.spreadsheets.values.update({
-                spreadsheetId: SPREADSHEET_ID, range: `${currentSheetName}!A1`, valueInputOption: 'USER-ENTERED',
+                spreadsheetId: SPREADSHEET_ID, range: `${currentSheetName}!A1`, valueInputOption: 'USER_ENTERED',
                 resource: { values: rows }
             });
         }
@@ -692,14 +699,16 @@ async function uploadImageToCloudinary(file) {
 }
 
 function openModal(title, init, onSave) {
-  const modal = $('#modal'), mTitle = $('#mTitle'), mName = $('#mName'), mBirth = $('#mBirth'), mDeath = $('#mDeath'), mNote = $('#mNote'), mAvatar = $('#mAvatar');
-  mTitle.textContent = title; mName.value = init?.name || ''; mBirth.value = init?.birth || ''; mDeath.value = init?.death || ''; mNote.value = init?.note || ''; mAvatar.value = init?.avatarUrl || '';
+  const modal = $('#modal'), mTitle = $('#mTitle'), mName = $('#mName'), mBirth = $('#mBirth'), mDeath = $('#mDeath'), mNote = $('#mNote'), mAvatar = $('#mAvatar'), mParentId = $('#mParentId');
+  mTitle.textContent = title; mName.value = init?.name || ''; mBirth.value = init?.birth || ''; mDeath.value = init?.death || ''; mNote.value = init?.note || ''; mAvatar.value = init?.avatarUrl || ''; mParentId.value = init?.parentId || '';
+  if (isOwner) mParentId.parentElement.style.display = 'flex'; else mParentId.parentElement.style.display = 'none';
+
   modal.classList.add('show');
   const btnSave = $('#mSave'), btnCancel = $('#mCancel');
   function cleanup() { modal.classList.remove('show'); btnSave.removeEventListener('click', saveHandler); btnCancel.removeEventListener('click', close); modal.removeEventListener('click', outside); document.removeEventListener('keydown', esc); }
   function saveHandler() {
       const name = mName.value.trim(); if (!name) { mName.focus(); return; }
-      onSave({ name, birth: mBirth.value.trim(), death: mDeath.value.trim(), note: mNote.value.trim(), avatarUrl: mAvatar.value.trim() }); cleanup();
+      onSave({ name, birth: mBirth.value.trim(), death: mDeath.value.trim(), note: mNote.value.trim(), avatarUrl: mAvatar.value.trim(), parentId: mParentId.value.trim() }); cleanup();
   }
   function close() { cleanup(); } function outside(e) { if (e.target === modal) close(); } function esc(e) { if (e.key === 'Escape') close(); }
   btnSave.addEventListener('click', saveHandler); btnCancel.addEventListener('click', close); modal.addEventListener('click', outside); document.addEventListener('keydown', esc);
@@ -745,7 +754,116 @@ function onDel(n) { if (!isOwner) return;
     scheduleRender();
   });
 }
-
+async function onProposeMember() {
+    openModal('Đề xuất thêm thành viên', {}, async (d) => {
+        if (!d.name || !d.parentId) { alert('Vui lòng nhập Tên và ID của cha/mẹ.'); return; }
+        const proposedData = [['', `'${d.parentId}`, d.name, d.birth, d.death, d.note, d.avatarUrl]];
+        try {
+            await gapi.client.sheets.spreadsheets.values.append({
+                spreadsheetId: SPREADSHEET_ID,
+                range: `${PENDING_SHEET_NAME}!A1`,
+                valueInputOption: 'USER_ENTERED',
+                resource: { values: proposedData }
+            });
+            alert('Đề xuất của bạn đã được gửi thành công và đang chờ quản trị viên duyệt.');
+        } catch (err) {
+            console.error('Lỗi khi gửi đề xuất:', err);
+            alert('Đã xảy ra lỗi khi gửi đề xuất. Vui lòng thử lại.');
+        }
+    });
+}
+async function loadPendingProposals() {
+    if (!isOwner) return;
+    try {
+        const response = await gapi.client.sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${PENDING_SHEET_NAME}!A:G`
+        });
+        const rows = response.result.values || [];
+        // Giả sử hàng đầu tiên là tiêu đề, bỏ qua
+        pendingProposals = rows.slice(1).map(row => ({
+            id: row[0],
+            parentId: row[1],
+            name: row[2],
+            birth: row[3],
+            death: row[4],
+            note: row[5],
+            avatarUrl: row[6],
+        }));
+        updatePendingProposalsUI();
+    } catch (err) {
+        console.error('Lỗi khi tải đề xuất:', err);
+    }
+}
+function updatePendingProposalsUI() {
+    pendingCountSpan.textContent = pendingProposals.length;
+    pendingProposalsBtn.style.display = isOwner ? 'flex' : 'none';
+    pendingList.innerHTML = '';
+    if (pendingProposals.length === 0) {
+        pendingList.innerHTML = '<li class="sub" style="text-align:center;">Không có đề xuất nào.</li>';
+        return;
+    }
+    pendingProposals.forEach((p, index) => {
+        const li = document.createElement('li');
+        li.className = 'pending-item';
+        li.innerHTML = `
+            <div class="pending-item-header">
+                <div>
+                    <div class="pending-item-name">${p.name}</div>
+                    <div class="pending-item-parent">Con của: ${p.parentId}</div>
+                </div>
+                <div>ID: ${p.id || 'tự động'}</div>
+            </div>
+            <div class="pending-item-actions">
+                <button class="btn btn-success" data-index="${index}" data-action="approve">Chấp nhận</button>
+                <button class="btn btn-danger" data-index="${index}" data-action="reject">Từ chối</button>
+            </div>
+        `;
+        pendingList.appendChild(li);
+    });
+}
+async function handlePendingAction(e) {
+    const action = e.target.dataset.action;
+    const index = parseInt(e.target.dataset.index, 10);
+    if (action === 'approve') {
+        const proposal = pendingProposals[index];
+        const newId = generateHierarchicalId(findById(data, proposal.parentId));
+        const newMember = {
+            id: newId,
+            parentId: proposal.parentId,
+            name: proposal.name,
+            birth: proposal.birth,
+            death: proposal.death,
+            note: proposal.note,
+            avatarUrl: proposal.avatarUrl,
+            children: []
+        };
+        const parentNode = findById(data, newMember.parentId);
+        if (parentNode) {
+            pushHistory();
+            if (!parentNode.children) parentNode.children = [];
+            parentNode.children.push(newMember);
+            await saveTreeData();
+            setUnsavedChanges(true);
+            updateLayout();
+            scheduleRender();
+            await gapi.client.sheets.spreadsheets.values.batchClear({
+                spreadsheetId: SPREADSHEET_ID,
+                ranges: [`${PENDING_SHEET_NAME}!A${index + 2}:G${index + 2}`]
+            });
+            await loadPendingProposals();
+        } else {
+            alert('Lỗi: Không tìm thấy thành viên cha/mẹ. Vui lòng từ chối đề xuất này.');
+        }
+    } else if (action === 'reject') {
+        await gapi.client.sheets.spreadsheets.values.batchClear({
+            spreadsheetId: SPREADSHEET_ID,
+            ranges: [`${PENDING_SHEET_NAME}!A${index + 2}:G${index + 2}`]
+        });
+        await loadPendingProposals();
+        alert('Đã từ chối đề xuất.');
+    }
+}
 function download(filename, data, type) {
     const a = document.createElement('a');
     let url;
@@ -1005,7 +1123,13 @@ async function loadUserInfo() {
     } else { isOwner = false; authContainer.innerHTML = `Xin chào, <b>${profile.name}</b> (Chế độ xem)<br/><button id="signout-button" class="btn" style="width:100%; margin-top: 8px;">Đăng xuất</button>`; $('#signout-button').onclick = handleSignoutClick; disableEditing(); }
     loadInitialData();
 }
-function updateAuthUI() { if (!isOwner) { authContainer.innerHTML = `<button id="signin-button" class="btn" style="width:100%">Đăng nhập để chỉnh sửa</button>`; $('#signin-button').onclick = handleAuthClick; } }
+function updateAuthUI() { 
+    if (!isOwner) { 
+        authContainer.innerHTML = `<button id="signin-button" class="btn" style="width:100%">Đăng nhập để chỉnh sửa</button>`; 
+        $('#signin-button').onclick = handleAuthClick; 
+    } 
+    pendingProposalsBtn.style.display = isOwner ? 'flex' : 'none';
+}
 async function loadInitialData() {
     if (!gapiInited) return; let sheetData;
     try {
@@ -1043,6 +1167,7 @@ async function loadInitialData() {
         const errorMsg = e?.result?.error?.message || e.message || 'Lỗi không xác định.';
         alert('Không thể tải dữ liệu. Chi tiết: ' + errorMsg); data = null; scheduleRender();
     }
+    await loadPendingProposals();
 }
 async function loadTreeData(sheetName) {
     if (!sheetName) return; currentSheetName = sheetName; document.body.style.cursor = 'wait'; data = null; scheduleRender();
@@ -1064,7 +1189,7 @@ async function saveSettingsToSheet() {
     if (!isOwner) return; const bgUrl = $('#bgUrlInput').value.trim(); const currentGapX = $('#gapXSlider').value; const newTitle = appTitle.textContent.trim();
     try {
         await gapi.client.sheets.spreadsheets.values.update({
-            spreadsheetId: SPREADSHEET_ID, range: `${SETTINGS_SHEET_NAME}!A1:B7`, valueInputOption: 'USER-ENTERED',
+            spreadsheetId: SPREADSHEET_ID, range: `${SETTINGS_SHEET_NAME}!A1:B7`, valueInputOption: 'USER_ENTERED',
             resource: { values: [ ['bg_url', bgUrl], ['gap_x', currentGapX], ['tree_title', newTitle], ['decoration_visible', decorationSettings.visible], ['decoration_size', decorationSettings.size], ['decoration_distance', decorationSettings.distance], ['decoration_url', decorationSettings.url] ] }
         });
     } catch(err) { console.error("Lỗi khi lưu cài đặt:", err); }
@@ -1258,6 +1383,13 @@ function init() {
   $('#act-edit-node').addEventListener('click', () => { if (highlightedNodeId) { const node = findById(data, highlightedNodeId); if (node) onEdit(node); } });
   $('#act-delete-node').addEventListener('click', () => { if (highlightedNodeId) { const node = findById(data, highlightedNodeId); if (node) onDel(node); } });
 
+  // New features
+  pendingProposalsBtn.onclick = () => {
+      pendingModal.classList.add('show');
+      updatePendingProposalsUI();
+  };
+  $('#btnClosePending').onclick = () => pendingModal.classList.remove('show');
+  pendingList.addEventListener('click', handlePendingAction);
   $('#mAvatarFile').onchange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -1266,7 +1398,6 @@ function init() {
       $('#mAvatar').value = imageUrl;
     }
   };
-
 }
 
 function updateControlsUI() {
