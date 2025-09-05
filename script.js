@@ -1425,7 +1425,8 @@ function updateControlsUI() {
         decorationSizeSlider.value = decorationSettings.size;
         decorationSizeLabel.textContent = decorationSettings.size;
         decorationDistanceSlider.value = decorationSettings.distance;
-        decorationDistanceLabel.textContent = decorationDistanceSettings.distance;
+        // Dòng này đã được sửa lỗi chính tả
+        decorationDistanceLabel.textContent = decorationSettings.distance;
         decorationUrlInput.value = decorationSettings.url;
     }
 }
