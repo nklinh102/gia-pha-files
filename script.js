@@ -6,12 +6,13 @@ const CLOUDINARY_UPLOAD_PRESET = 'gia_pha_preset';
 
 const API_KEY = 'AIzaSyAOnCKz1lJjkWvJhWuhc9p0GMXcq3EJ-5U';
 const CLIENT_ID = '44689282931-21nb0br3on3v8dscjfibrfutg7isj9fj.apps.googleusercontent.com';
-const SPREADSHEET_ID = '1z-LGeQo8w0jzF9mg8LD_bMsXKEvtgc_lgY5F-EkTgBY';
+const SPREADSHEET_ID = '1vlg9btMR-kP_m2gbYy4AoJ-Z41qzxpkERMBCx4LyxqU';
+const SUBMISSION_SHEET_ID = '1z-LGeQo8w0jzF9mg8LD_bMsXKEvtgc_lgY5F-EkTgBY'; // ID của sheet đề xuất mới
 const ADMIN_EMAIL = 'nklinh102@gmail.com';
 const INDEX_SHEET_NAME = '_index';
 const SETTINGS_SHEET_NAME = 'settings';
 const MEDIA_SHEET_NAME = 'Media';
-const PENDING_SHEET_NAME = 'PendingMembers'; // Tên sheet mới
+const PENDING_SHEET_NAME = 'PendingMembers'; // Tên sheet trong SPREADSHEET_ID cũ
 
 // ===================================================================
 
@@ -702,6 +703,7 @@ function openModal(title, init, onSave) {
   const modal = $('#modal'), mTitle = $('#mTitle'), mName = $('#mName'), mBirth = $('#mBirth'), mDeath = $('#mDeath'), mNote = $('#mNote'), mAvatar = $('#mAvatar'), mParentId = $('#mParentId');
   mTitle.textContent = title; mName.value = init?.name || ''; mBirth.value = init?.birth || ''; mDeath.value = init?.death || ''; mNote.value = init?.note || ''; mAvatar.value = init?.avatarUrl || ''; 
   
+  // Hiển thị trường Parent ID cho tất cả mọi người (kể cả người dùng không phải admin)
   mParentId.parentElement.style.display = 'flex';
   mParentId.value = init?.parentId || ''; // Tự động điền parentId
 
@@ -757,9 +759,18 @@ function onDel(n) { if (!isOwner) return;
   });
 }
 async function onProposeMember(prefilledParentId = null) {
+    if (!gapi.auth.getToken()) {
+        alert('Vui lòng đăng nhập để gửi đề xuất.');
+        return;
+    }
     openModal('Đề xuất thêm thành viên', { parentId: prefilledParentId }, async (d) => {
-        if (!d.name || !d.parentId) { alert('Vui lòng nhập Tên và ID của cha/mẹ.'); return; }
+        if (!d.name || !d.parentId) {
+            alert('Vui lòng nhập Tên và ID của cha/mẹ.');
+            return;
+        }
+
         const proposedData = [['', d.parentId, d.name, d.birth, d.death, d.note, d.avatarUrl]];
+        
         try {
             await gapi.client.sheets.spreadsheets.values.append({
                 spreadsheetId: SPREADSHEET_ID,
@@ -767,6 +778,7 @@ async function onProposeMember(prefilledParentId = null) {
                 valueInputOption: 'USER_ENTERED',
                 resource: { values: proposedData }
             });
+            
             alert('Đề xuất của bạn đã được gửi thành công và đang chờ quản trị viên duyệt.');
         } catch (err) {
             console.error('Lỗi khi gửi đề xuất:', err);
@@ -1032,7 +1044,7 @@ function applySearch(shouldCenter) {
   const q = norm(searchInput.value || '');
   let first = null;
   nodesFlat.forEach(n => {
-    const m = !!(n._norm && n._norm.includes(q));
+    m = !!(n._norm && n._norm.includes(q));
     n.isSearchMatch = m;
     n.isSearchFocus = false;
     if (m && !first) {
@@ -1125,13 +1137,7 @@ async function loadUserInfo() {
     } else { isOwner = false; authContainer.innerHTML = `Xin chào, <b>${profile.name}</b> (Chế độ xem)<br/><button id="signout-button" class="btn" style="width:100%; margin-top: 8px;">Đăng xuất</button>`; $('#signout-button').onclick = handleSignoutClick; disableEditing(); }
     loadInitialData();
 }
-function updateAuthUI() { 
-    if (!isOwner) { 
-        authContainer.innerHTML = `<button id="signin-button" class="btn" style="width:100%">Đăng nhập để chỉnh sửa</button>`; 
-        $('#signin-button').onclick = handleAuthClick; 
-    } 
-    pendingProposalsBtn.style.display = isOwner ? 'flex' : 'none';
-}
+function updateAuthUI() { if (!isOwner) { authContainer.innerHTML = `<button id="signin-button" class="btn" style="width:100%">Đăng nhập để chỉnh sửa</button>`; $('#signin-button').onclick = handleAuthClick; } }
 async function loadInitialData() {
     if (!gapiInited) return; let sheetData;
     try {
@@ -1169,7 +1175,6 @@ async function loadInitialData() {
         const errorMsg = e?.result?.error?.message || e.message || 'Lỗi không xác định.';
         alert('Không thể tải dữ liệu. Chi tiết: ' + errorMsg); data = null; scheduleRender();
     }
-    await loadPendingProposals();
 }
 async function loadTreeData(sheetName) {
     if (!sheetName) return; currentSheetName = sheetName; document.body.style.cursor = 'wait'; data = null; scheduleRender();
@@ -1191,7 +1196,7 @@ async function saveSettingsToSheet() {
     if (!isOwner) return; const bgUrl = $('#bgUrlInput').value.trim(); const currentGapX = $('#gapXSlider').value; const newTitle = appTitle.textContent.trim();
     try {
         await gapi.client.sheets.spreadsheets.values.update({
-            spreadsheetId: SPREADSHEET_ID, range: `${SETTINGS_SHEET_NAME}!A1:B7`, valueInputOption: 'USER_ENTERED',
+            spreadsheetId: SPREADSHEET_ID, range: `${SETTINGS_SHEET_NAME}!A1:B7`, valueInputOption: 'USER-ENTERED',
             resource: { values: [ ['bg_url', bgUrl], ['gap_x', currentGapX], ['tree_title', newTitle], ['decoration_visible', decorationSettings.visible], ['decoration_size', decorationSettings.size], ['decoration_distance', decorationSettings.distance], ['decoration_url', decorationSettings.url] ] }
         });
     } catch(err) { console.error("Lỗi khi lưu cài đặt:", err); }
@@ -1328,7 +1333,7 @@ function init() {
   });
   
   treeCanvas.addEventListener('wheel', (e) => {
-    e.preventDefault(); const rect = treeCanvas.getBoundingClientRect();
+    e.preventDefault(); const rect = canvasContainer.getBoundingClientRect();
     const mouseX = e.clientX - rect.left, mouseY = e.clientY - rect.top;
     const worldXBefore = (mouseX - panX) / scale, worldYBefore = (mouseY - panY) / scale;
     const newScale = clamp(scale * (1 + e.deltaY * -0.001), .1, 5);
@@ -1385,29 +1390,6 @@ function init() {
   $('#act-edit-node').addEventListener('click', () => { if (highlightedNodeId) { const node = findById(data, highlightedNodeId); if (node) onEdit(node); } });
   $('#act-delete-node').addEventListener('click', () => { if (highlightedNodeId) { const node = findById(data, highlightedNodeId); if (node) onDel(node); } });
 
-  // New features
-  pendingProposalsBtn.onclick = () => {
-      pendingModal.classList.add('show');
-      updatePendingProposalsUI();
-  };
-  $('#btnClosePending').onclick = () => pendingModal.classList.remove('show');
-  pendingList.addEventListener('click', handlePendingAction);
-  $('#mAvatarFile').onchange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const imageUrl = await uploadImageToCloudinary(file);
-    if (imageUrl) {
-      $('#mAvatar').value = imageUrl;
-    }
-  };
-
-  const btnProposeMember = $('#btnProposeMember');
-  if (btnProposeMember) {
-      btnProposeMember.onclick = () => {
-          onProposeMember();
-      };
-  }
-  
   const proposeChildBtn = $('#propose-child-btn');
   if (proposeChildBtn) {
       proposeChildBtn.addEventListener('click', () => {
@@ -1419,6 +1401,7 @@ function init() {
           }
       });
   }
+
 }
 
 function updateControlsUI() {
