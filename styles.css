@@ -259,13 +259,6 @@ font-size:11px; padding:.12rem .35rem; border:1px solid var(--border); border-ra
 .owner-mode .owner-only-field {
   display: flex !important;
 }
-/* Thêm class mới để kiểm soát hiển thị cho người dùng thường */
-.public-only-field {
-    display: none !important;
-}
-body:not(.owner-mode) .public-only-field {
-    display: flex !important;
-}
 
 #overlay {
   position: fixed;
