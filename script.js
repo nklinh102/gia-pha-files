@@ -7,12 +7,12 @@ const CLOUDINARY_UPLOAD_PRESET = 'gia_pha_preset';
 const API_KEY = 'AIzaSyAOnCKz1lJjkWvJhWuhc9p0GMXcq3EJ-5U';
 const CLIENT_ID = '44689282931-21nb0br3on3v8dscjfibrfutg7isj9fj.apps.googleusercontent.com';
 const SPREADSHEET_ID = '1z-LGeQo8w0jzF9mg8LD_bMsXKEvtgc_lgY5F-EkTgBY';
-const SUBMISSION_SHEET_ID = '1vlg9btMR-kP_m2gbYy4AoJ-Z41qzxpkERMBCx4LyxqU';
+const SUBMISSION_SHEET_ID = '1vlg9btMR-kP_m2gbYy4AoJ-Z41qzxpkERMBCx4LyxqU'; // ID của sheet đề xuất mới
 const ADMIN_EMAIL = 'nklinh102@gmail.com';
 const INDEX_SHEET_NAME = '_index';
 const SETTINGS_SHEET_NAME = 'settings';
 const MEDIA_SHEET_NAME = 'Media';
-const PENDING_SHEET_NAME = 'PendingMembers';
+const PENDING_SHEET_NAME = 'PendingMembers'; // Tên sheet trong SPREADSHEET_ID cũ
 
 // ===================================================================
 
@@ -712,8 +712,9 @@ function openModal(title, init, onSave) {
     mParentId.parentElement.style.display = 'flex';
     mParentId.value = init?.parentId || ''; 
   } else {
-    // Ẩn trường ParentId cho người dùng thường
+    // Ẩn trường ParentId cho người dùng thường và tự động điền giá trị
     mParentId.parentElement.style.display = 'none';
+    mParentId.value = init?.parentId || ''; // Vẫn điền giá trị để gửi đi
   }
 
   modal.classList.add('show');
