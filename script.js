@@ -788,7 +788,7 @@ function onDel(n) { if (!isOwner) return;
 }
 
 // Thay thế YOUR_WEB_APP_URL bằng URL thật của bạn
-const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycby1gn5oJAGfJwqY4K276vUJ-lOaHYOIyKJS-PAhZGbVLEgaJlkrqsGltmMnuY0ueLuoQ/exec';
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycby1gn5oJAGfJwqY4K276vUJ-lOaHYOIyKJS-PAhZGbVLEgaJlkrqsGltmMnuY0uejLuoQ/exec';
 
 async function onProposeMember(prefilledParentId = null) {
     openModal('Đề xuất thêm thành viên', { parentId: prefilledParentId }, async (d) => {
