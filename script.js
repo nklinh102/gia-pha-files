@@ -7,12 +7,11 @@ const CLOUDINARY_UPLOAD_PRESET = 'gia_pha_preset';
 const API_KEY = 'AIzaSyAOnCKz1lJjkWvJhWuhc9p0GMXcq3EJ-5U';
 const CLIENT_ID = '44689282931-21nb0br3on3v8dscjfibrfutg7isj9fj.apps.googleusercontent.com';
 const SPREADSHEET_ID = '1z-LGeQo8w0jzF9mg8LD_bMsXKEvtgc_lgY5F-EkTgBY';
-const SUBMISSION_SHEET_ID = '1vlg9btMR-kP_m2gbYy4AoJ-Z41qzxpkERMBCx4LyxqU'; // ID của sheet đề xuất mới
+const SUBMISSION_SHEET_NAME = 'PendingMembers'; // Sử dụng tên sheet đã thống nhất
 const ADMIN_EMAIL = 'nklinh102@gmail.com';
 const INDEX_SHEET_NAME = '_index';
 const SETTINGS_SHEET_NAME = 'settings';
 const MEDIA_SHEET_NAME = 'Media';
-const PENDING_SHEET_NAME = 'Dexuat'; // Tên sheet trong SPREADSHEET_ID cũ
 
 // ===================================================================
 
@@ -789,7 +788,7 @@ function onDel(n) { if (!isOwner) return;
 }
 
 // Thay thế YOUR_WEB_APP_URL bằng URL thật của bạn
-const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycby1gn5oJAGfJwqY4K276vUJ-lOaHYOIyKJS-PAhZGbVLEgaJlkrqsGltmMnuY0uejLuoQ/exec';
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycby1gn5oJAGfJwqY4K276vUJ-lOaHYOIyKJS-PAhZGbVLEgaJlkrqsGltmMnuY0ueLuoQ/exec';
 
 async function onProposeMember(prefilledParentId = null) {
     openModal('Đề xuất thêm thành viên', { parentId: prefilledParentId }, async (d) => {
@@ -819,11 +818,12 @@ async function onProposeMember(prefilledParentId = null) {
             if (response.ok) {
                 alert('Đề xuất của bạn đã được gửi thành công và đang chờ quản trị viên duyệt.');
             } else {
-                throw new Error('Yêu cầu đến máy chủ thất bại.');
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Yêu cầu đến máy chủ thất bại.');
             }
         } catch (err) {
             console.error('Lỗi khi gửi đề xuất:', err);
-            alert('Đã xảy ra lỗi khi gửi đề xuất. Vui lòng thử lại.');
+            alert('Đã xảy ra lỗi khi gửi đề xuất. Vui lòng thử lại. Chi tiết: ' + err.message);
         }
     });
 }
@@ -832,7 +832,7 @@ async function loadPendingProposals() {
     try {
         const response = await gapi.client.sheets.spreadsheets.values.get({
             spreadsheetId: SPREADSHEET_ID,
-            range: `${PENDING_SHEET_NAME}!A:G`
+            range: `${SUBMISSION_SHEET_NAME}!A:G`
         });
         const rows = response.result.values || [];
         // Giả sử hàng đầu tiên là tiêu đề, bỏ qua
@@ -903,8 +903,8 @@ async function handlePendingAction(e) {
             updateLayout();
             scheduleRender();
             await gapi.client.sheets.spreadsheets.values.batchClear({
-                spreadsheetId: SUBMISSION_SHEET_ID,
-                ranges: [`${PENDING_SHEET_NAME}!A${index + 2}:G${index + 2}`]
+                spreadsheetId: SPREADSHEET_ID,
+                ranges: [`${SUBMISSION_SHEET_NAME}!A${index + 2}:G${index + 2}`]
             });
             await loadPendingProposals();
         } else {
@@ -912,8 +912,8 @@ async function handlePendingAction(e) {
         }
     } else if (action === 'reject') {
         await gapi.client.sheets.spreadsheets.values.batchClear({
-            spreadsheetId: SUBMISSION_SHEET_ID,
-            ranges: [`${PENDING_SHEET_NAME}!A${index + 2}:G${index + 2}`]
+            spreadsheetId: SPREADSHEET_ID,
+            ranges: [`${SUBMISSION_SHEET_NAME}!A${index + 2}:G${index + 2}`]
         });
         await loadPendingProposals();
         alert('Đã từ chối đề xuất.');
