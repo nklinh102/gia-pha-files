@@ -629,3 +629,96 @@ font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     background-color: var(--danger);
     color: white;
 }
+/* DÁN TOÀN BỘ ĐOẠN NÀY VÀO CUỐI FILE styles.css */
+
+/* --- GIAO DIỆN MỚI CHO INFO PANEL --- */
+
+#info-panel {
+  position: absolute; 
+  bottom: 20px;
+  left: 20px;
+  z-index: 10;
+  width: 250px; /* Tăng chiều rộng một chút */
+  padding: 12px;
+  padding-top: 45px; /* Thêm khoảng trống ở trên cho tên */
+  transition: transform .3s ease, opacity .3s ease, visibility .3s ease;
+  margin-top: 40px; /* Đẩy panel xuống để có chỗ cho avatar */
+}
+
+#info-panel.hidden {
+  transform: translateY(10px);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Định dạng Avatar mới */
+#info-panel #info-avatar {
+  position: absolute;
+  top: 0;
+  right: 15px;
+  transform: translateY(-50%); /* Dịch chuyển avatar lên trên 50% chiều cao của nó */
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  border: 4px solid var(--panel); /* Dùng màu nền panel để tạo hiệu ứng cắt */
+  background-size: cover;
+  background-position: center;
+  z-index: 12;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
+
+/* Định dạng Tên mới */
+#info-panel #info-name {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent);
+  margin: 0 0 15px 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  line-height: 1.2;
+}
+
+/* Lưới thông tin */
+#info-panel .info-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px; /* Khoảng cách giữa các mục */
+}
+
+#info-panel .info-item {
+  line-height: 1.3;
+}
+
+/* Định dạng cho nhãn (ví dụ: "Ngày sinh:") */
+#info-panel .info-label {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+
+/* Định dạng cho giá trị (ví dụ: "1990") */
+#info-panel .info-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* Định dạng nút Đề xuất mới */
+#info-panel #act-propose-child {
+  width: 100%;
+  margin-top: 20px;
+  background-color: var(--success);
+  color: white;
+  border-radius: 999px; /* Bo tròn thành hình viên thuốc */
+  font-weight: 600;
+  padding: 12px;
+  border: none;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+#info-panel #act-propose-child:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(from var(--success) r g b / 0.4);
+}
