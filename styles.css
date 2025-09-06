@@ -630,7 +630,7 @@ font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   font-size: 20px; /* Giảm kích thước tên */
   font-weight: 700;
   color: var(--accent);
-  margin: 0 0 12px 0; /* Giảm margin bottom */
+  margin: -10px 0 12px 0; /* Giảm margin bottom */
   padding-bottom: 8px; /* Giảm padding bottom */
   border-bottom: 1px solid var(--border);
   line-height: 1.2;
