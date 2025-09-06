@@ -7,6 +7,7 @@ const CLOUDINARY_UPLOAD_PRESET = 'gia_pha_preset';
 const API_KEY = 'AIzaSyAOnCKz1lJjkWvJhWuhc9p0GMXcq3EJ-5U';
 const CLIENT_ID = '44689282931-21nb0br3on3v8dscjfibrfutg7isj9fj.apps.googleusercontent.com';
 const SPREADSHEET_ID = '1z-LGeQo8w0jzF9mg8LD_bMsXKEvtgc_lgY5F-EkTgBY';
+const PROPOSAL_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbxngHH01as4d2rqMVUztd_AK1k6kgfZOhtFxiaphdFlxY4AcblBgnPcx3l-VZAqxOWU-A/exec';
 const ADMIN_EMAIL = 'nklinh102@gmail.com';
 const INDEX_SHEET_NAME = '_index';
 const SETTINGS_SHEET_NAME = 'settings';
@@ -705,6 +706,86 @@ function openModal(title, init, onSave) {
   btnSave.addEventListener('click', saveHandler); btnCancel.addEventListener('click', close); modal.addEventListener('click', outside); document.addEventListener('keydown', esc);
   setTimeout(() => mName.focus(), 50);
 }
+// ====== ĐỀ XUẤT THÊM CON ======
+function openProposalModal(parent) {
+  const modal = $('#proposal-modal');
+  if (!modal) return;
+
+  $('#pParentName').textContent = parent.name || parent.id;
+  $('#pParentId').value = parent.id;
+  $('#pName').value = '';
+  $('#pBirth').value = '';
+  $('#pDeath').value = '';
+  $('#pNote').value = '';
+  $('#pSubmitter').value = '';
+
+  modal.classList.add('show');
+
+  const btnCancel = $('#pCancel');
+  const btnSend = $('#pSend');
+
+  const cleanup = () => {
+    modal.classList.remove('show');
+    btnCancel.removeEventListener('click', onCancel);
+    btnSend.removeEventListener('click', onSend);
+    modal.removeEventListener('click', onOutside);
+    document.removeEventListener('keydown', onEsc);
+  };
+  const onCancel = () => cleanup();
+  const onOutside = (e) => { if (e.target === modal) cleanup(); };
+  const onEsc = (e) => { if (e.key === 'Escape') cleanup(); };
+
+  const onSend = async () => {
+    const payload = {
+      action: 'submit',
+      sheetName: currentSheetName,
+      mainSpreadsheetId: SPREADSHEET_ID,
+      parentId: $('#pParentId').value,
+      parentName: $('#pParentName').textContent,
+      child: {
+        name: ($('#pName').value || '').trim(),
+        birth: ($('#pBirth').value || '').trim(),
+        death: ($('#pDeath').value || '').trim(),
+        note: ($('#pNote').value || '').trim()
+      },
+      submitter: ($('#pSubmitter').value || '').trim(),
+      pageUrl: location.href,
+      ua: navigator.userAgent,
+      ts: new Date().toISOString()
+    };
+
+    if (!payload.child.name) {
+      alert('Vui lòng nhập Họ và tên.');
+      return;
+    }
+
+    btnSend.disabled = true;
+    btnSend.textContent = 'Đang gửi...';
+    try {
+      const res = await fetch(PROPOSAL_WEBAPP_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json.ok !== true) throw new Error(json.error || 'Gửi không thành công');
+      alert('✅ Đã gửi đề xuất. Cảm ơn bạn!');
+      cleanup();
+    } catch (err) {
+      console.error(err);
+      alert('❌ Gửi thất bại. Vui lòng thử lại sau.');
+    } finally {
+      btnSend.disabled = false;
+      btnSend.textContent = 'Gửi đề xuất';
+    }
+  };
+
+  btnCancel.addEventListener('click', onCancel);
+  btnSend.addEventListener('click', onSend);
+  modal.addEventListener('click', onOutside);
+  document.addEventListener('keydown', onEsc);
+}
+
 function openConfirm(message, onYes) {
   const c = $('#confirm'), msg = $('#cMsg'), yes = $('#cYes'), no = $('#cNo');
   msg.textContent = message; c.classList.add('show');
@@ -1177,6 +1258,17 @@ function init() {
   document.addEventListener('click', (e) => {
     if (!searchContainer.contains(e.target)) {
       searchContainer.classList.remove('search-expanded');
+
+  // Nút "Đề xuất thêm con" (panel info chỉ hiện khi không phải owner)
+  const btnPropose = $('#btnProposeChild');
+  if (btnPropose) {
+    btnPropose.addEventListener('click', () => {
+      if (!highlightedNodeId) return;
+      const parent = findById(data, highlightedNodeId);
+      if (parent) openProposalModal(parent);
+    });
+  }
+
     }
   });
 
