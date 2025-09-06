@@ -763,6 +763,9 @@ function onDel(n) { if (!isOwner) return;
   });
 }
 
+// Thay thế YOUR_WEB_APP_URL bằng URL thật của bạn
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycby1gn5oJAGfJwqY4K276vUJ-lOaHYOIyKJS-PAhZGbVLEgaJlkrqsGltmMnuY0uejLuoQ/exec';
+
 async function onProposeMember(prefilledParentId = null) {
     openModal('Đề xuất thêm thành viên', { parentId: prefilledParentId }, async (d) => {
         if (!d.name || !d.parentId) {
@@ -770,17 +773,29 @@ async function onProposeMember(prefilledParentId = null) {
             return;
         }
 
-        const proposedData = [['', d.parentId, d.name, d.birth, d.death, d.note, d.avatarUrl]];
+        const formData = {
+            parentId: d.parentId,
+            name: d.name,
+            birth: d.birth,
+            death: d.death,
+            note: d.note,
+            avatarUrl: d.avatarUrl,
+        };
         
         try {
-            await gapi.client.sheets.spreadsheets.values.append({
-                spreadsheetId: SUBMISSION_SHEET_ID,
-                range: `${PENDING_SHEET_NAME}!A1`,
-                valueInputOption: 'USER_ENTERED',
-                resource: { values: proposedData }
+            const response = await fetch(WEB_APP_URL, {
+                method: 'POST',
+                body: JSON.stringify(formData),
+                headers: {
+                    'Content-Type': 'application/json'
+                }
             });
-            
-            alert('Đề xuất của bạn đã được gửi thành công và đang chờ quản trị viên duyệt.');
+
+            if (response.ok) {
+                alert('Đề xuất của bạn đã được gửi thành công và đang chờ quản trị viên duyệt.');
+            } else {
+                throw new Error('Yêu cầu đến máy chủ thất bại.');
+            }
         } catch (err) {
             console.error('Lỗi khi gửi đề xuất:', err);
             alert('Đã xảy ra lỗi khi gửi đề xuất. Vui lòng thử lại.');
