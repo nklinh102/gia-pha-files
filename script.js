@@ -1,3 +1,5 @@
+// FILE SCRIPT.JS HOÀN CHỈNH - SAO CHÉP VÀ THAY THẾ TOÀN BỘ
+
 // ===================================================================
 // ====== THÔNG TIN CẤU HÌNH ======
 // ===================================================================
@@ -8,6 +10,8 @@ const API_KEY = 'AIzaSyAOnCKz1lJjkWvJhWuhc9p0GMXcq3EJ-5U';
 const CLIENT_ID = '44689282931-21nb0br3on3v8dscjfibrfutg7isj9fj.apps.googleusercontent.com';
 const SPREADSHEET_ID = '1z-LGeQo8w0jzF9mg8LD_bMsXKEvtgc_lgY5F-EkTgBY';
 const PROPOSALS_SPREADSHEET_ID = '15Glu750DS5C-pZvXURHsjz8ixawvLrrW4wSwKMkq6q0'; 
+// DÁN WEB APP URL BẠN VỪA SAO CHÉP Ở BƯỚC 3 VÀO ĐÂY
+const PROPOSAL_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxJ9F6LjUvxs6ER_2ChqgrZMczMmeqWReAoHe63URkdxj2bunx3bs0VKWWU2L9m5CaY4Q/exec'; 
 const ADMIN_EMAIL = 'nklinh102@gmail.com';
 const INDEX_SHEET_NAME = '_index';
 const SETTINGS_SHEET_NAME = 'settings';
@@ -1413,8 +1417,6 @@ function onProposeChild(parentNode) {
         if (!parentNode.children) parentNode.children = [];
         parentNode.children.push(tempChildNode);
         
-        // Bọc trong setTimeout để đảm bảo modal đã đóng hoàn toàn
-        // trước khi thực hiện các tính toán nặng về layout.
         setTimeout(() => {
             console.log("Adding proposal node to view:", tempChildNode);
             updateLayout();
@@ -1427,41 +1429,47 @@ function onProposeChild(parentNode) {
 }
 
 async function saveProposalToSheet(nodeData) {
-    if (!gapiInited) {
-        console.error("GAPI is not ready. Cannot save proposal.");
+    // Đây là hàm đã được thay đổi để sử dụng Web App
+    if (!PROPOSAL_WEB_APP_URL || PROPOSAL_WEB_APP_URL === 'DÁN_WEB_APP_URL_CỦA_BẠN_VÀO_ĐÂY') {
+        console.error("Lỗi cấu hình: Vui lòng dán Web App URL vào hằng số PROPOSAL_WEB_APP_URL.");
+        alert("Lỗi cấu hình. Không thể gửi đề xuất.");
         return;
     }
+    
     try {
-        const proposalId = nodeData.id;
-        const values = [[
-            `'${nodeData.parentId}`,
-            nodeData.name,
-            nodeData.birth,
-            nodeData.death,
-            nodeData.note,
-            nodeData.avatarUrl,
-            proposalId,
-            'pending'
-        ]];
+        const payload = {
+            parentId: nodeData.parentId,
+            name: nodeData.name,
+            birth: nodeData.birth,
+            death: nodeData.death,
+            note: nodeData.note,
+            avatarUrl: nodeData.avatarUrl,
+            proposalId: nodeData.id
+        };
 
-        await gapi.client.sheets.spreadsheets.values.append({
-            spreadsheetId: PROPOSALS_SPREADSHEET_ID,
-            range: `${PROPOSALS_SHEET_NAME}!A:H`,
-            valueInputOption: 'USER_ENTERED',
-            insertDataOption: 'INSERT_ROWS',
-            resource: { values: values }
+        // Sử dụng fetch để gửi dữ liệu đến Web App
+        const response = await fetch(PROPOSAL_WEB_APP_URL, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+            headers: {
+                'Content-Type': 'text/plain;charset=utf-8', // Apps Script doPost cần kiểu này
+            },
         });
-        console.log("Proposal saved to sheet successfully.");
+        
+        console.log("Proposal data sent to Web App.");
+
     } catch (err) {
-        console.error("Lỗi nghiêm trọng khi lưu đề xuất vào Sheet:", err.result?.error?.message || err.message);
+        console.error("Lỗi nghiêm trọng khi gửi đề xuất đến Web App:", err);
         alert("Đã xảy ra lỗi khi gửi đề xuất của bạn. Vui lòng kiểm tra Console (F12) để biết chi tiết.");
     }
 }
 
+
 async function loadAndApplyProposals() {
-    if (!data) return;
+    if (!data || !isOwner) return; // Chỉ Admin mới tải đề xuất
     console.log("Admin mode: Loading proposals from sheet...");
     try {
+        // Admin đã đăng nhập, nên có quyền đọc sheet đề xuất
         const response = await gapi.client.sheets.spreadsheets.values.get({
             spreadsheetId: PROPOSALS_SPREADSHEET_ID,
             range: `${PROPOSALS_SHEET_NAME}!A:H`,
