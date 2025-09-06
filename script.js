@@ -1,5 +1,3 @@
-// FILE SCRIPT.JS HOÀN CHỈNH - SAO CHÉP VÀ THAY THẾ TOÀN BỘ
-
 // ===================================================================
 // ====== THÔNG TIN CẤU HÌNH ======
 // ===================================================================
@@ -10,8 +8,10 @@ const API_KEY = 'AIzaSyAOnCKz1lJjkWvJhWuhc9p0GMXcq3EJ-5U';
 const CLIENT_ID = '44689282931-21nb0br3on3v8dscjfibrfutg7isj9fj.apps.googleusercontent.com';
 const SPREADSHEET_ID = '1z-LGeQo8w0jzF9mg8LD_bMsXKEvtgc_lgY5F-EkTgBY';
 const PROPOSALS_SPREADSHEET_ID = '15Glu750DS5C-pZvXURHsjz8ixawvLrrW4wSwKMkq6q0'; 
-// DÁN WEB APP URL BẠN VỪA SAO CHÉP Ở BƯỚC 3 VÀO ĐÂY
+
+// ❗️❗️❗️ DÁN WEB APP URL CỦA BẠN VÀO ĐÂY ❗️❗️❗️
 const PROPOSAL_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxJ9F6LjUvxs6ER_2ChqgrZMczMmeqWReAoHe63URkdxj2bunx3bs0VKWWU2L9m5CaY4Q/exec'; 
+
 const ADMIN_EMAIL = 'nklinh102@gmail.com';
 const INDEX_SHEET_NAME = '_index';
 const SETTINGS_SHEET_NAME = 'settings';
@@ -549,7 +549,6 @@ function updateSelectionActions() {
     }
 }
 
-
 function getGiap(node) {
     if (!data || !node || node.depth < 1) {
         return 'N/A';
@@ -642,7 +641,6 @@ function updateInfoPanel(nodeId) {
         panel.querySelector('.info-grid').appendChild(proposalBtn);
     }
 }
-
 
 function getCoordsFromEvent(e) {
     const rect = treeCanvas.getBoundingClientRect();
@@ -1424,18 +1422,53 @@ function onProposeChild(parentNode) {
         }, 0);
 
         alert('Đã gửi đề xuất của bạn. Vui lòng chờ quản trị viên phê duyệt.');
-        await saveProposalToSheet(tempChildNode);
+        await saveProposalToSheet(tempChildNode, currentSheetName);
     });
 }
 
-// Thay thế hàm này
+async function saveProposalToSheet(nodeData, sheetName) {
+    if (!PROPOSAL_WEB_APP_URL || PROPOSAL_WEB_APP_URL === 'DÁN_WEB_APP_URL_CỦA_BẠN_VÀO_ĐÂY') {
+        console.error("Lỗi cấu hình: Vui lòng dán Web App URL vào hằng số PROPOSAL_WEB_APP_URL.");
+        alert("Lỗi cấu hình. Không thể gửi đề xuất.");
+        return;
+    }
+    
+    try {
+        const payload = {
+            treeId: sheetName,
+            parentId: nodeData.parentId,
+            name: nodeData.name,
+            birth: nodeData.birth,
+            death: nodeData.death,
+            note: nodeData.note,
+            avatarUrl: nodeData.avatarUrl,
+            proposalId: nodeData.id
+        };
+
+        const response = await fetch(PROPOSAL_WEB_APP_URL, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+            headers: {
+                'Content-Type': 'text/plain;charset=utf-8',
+            },
+        });
+        
+        console.log("Proposal data sent to Web App.");
+
+    } catch (err) {
+        console.error("Lỗi nghiêm trọng khi gửi đề xuất đến Web App:", err);
+        alert("Đã xảy ra lỗi khi gửi đề xuất của bạn. Vui lòng kiểm tra Console (F12) để biết chi tiết.");
+    }
+}
+
+
 async function loadAndApplyProposals() {
     if (!data || !isOwner) return;
     console.log(`Admin mode: Loading proposals for tree '${currentSheetName}'...`);
     try {
         const response = await gapi.client.sheets.spreadsheets.values.get({
             spreadsheetId: PROPOSALS_SPREADSHEET_ID,
-            range: `${PROPOSALS_SHEET_NAME}!A:I`, // Mở rộng vùng đọc ra cột I
+            range: `${PROPOSALS_SHEET_NAME}!A:I`,
         });
         const proposals = response.result.values;
         if (proposals && proposals.length > 1) {
@@ -1447,9 +1480,15 @@ async function loadAndApplyProposals() {
             const proposalIdIdx = headers.indexOf('proposalid');
 
             if (treeIdIdx === -1 || parentIdIdx === -1) {
-                console.error("LỖI CẤU HÌNH SHEET 'Dexuat': Không tìm thấy cột 'treeId' hoặc 'parentId'.");
+                console.error("LỖI CẤU HÌNH SHEET 'Dexuat': Không tìm thấy cột 'treeId' hoặc 'parentId'. Vui lòng kiểm tra lại tên cột trong Google Sheet.");
+                alert("Lỗi cấu hình sheet đề xuất. Vui lòng kiểm tra Console (F12) để biết chi tiết.");
                 return;
             }
+
+            const birthIdx = headers.indexOf('birth');
+            const deathIdx = headers.indexOf('death');
+            const noteIdx = headers.indexOf('note');
+            const avatarIdx = headers.indexOf('avatarurl');
 
             let loadedCount = 0;
             for (let i = 1; i < proposals.length; i++) {
@@ -1458,7 +1497,6 @@ async function loadAndApplyProposals() {
 
                 const proposalTreeId = row[treeIdIdx];
 
-                // --- LOGIC QUAN TRỌNG: CHỈ XỬ LÝ NẾU ĐỀ XUẤT THUỘC GIA PHẢ HIỆN TẠI ---
                 if (proposalTreeId === currentSheetName) {
                     let parentId = row[parentIdIdx];
                     if (parentId && typeof parentId === 'string' && parentId.startsWith("'")) {
@@ -1472,10 +1510,10 @@ async function loadAndApplyProposals() {
                             id: row[proposalIdIdx] || 'proposal_loaded_' + i,
                             parentId: parentId,
                             name: row[nameIdx] || 'Chưa đặt tên',
-                            birth: row[headers.indexOf('birth')] ? row[headers.indexOf('birth')] : '',
-                            death: row[headers.indexOf('death')] ? row[headers.indexOf('death')] : '',
-                            note: row[headers.indexOf('note')] ? row[headers.indexOf('note')] : '',
-                            avatarUrl: row[headers.indexOf('avatarurl')] ? row[headers.indexOf('avatarurl')] : '',
+                            birth: row[birthIdx] || '',
+                            death: row[deathIdx] || '',
+                            note: row[noteIdx] || '',
+                            avatarUrl: row[avatarIdx] || '',
                             children: [],
                             isProposal: true,
                             proposalRow: i + 1
@@ -1495,78 +1533,7 @@ async function loadAndApplyProposals() {
         console.error("Không thể tải danh sách đề xuất:", err.result?.error?.message || err.message);
     }
 }
-async function loadAndApplyProposals() {
-    if (!data || !isOwner) return; // Chỉ Admin mới tải đề xuất
-    console.log("Admin mode: Loading proposals from sheet...");
-    try {
-        // Admin đã đăng nhập, nên có quyền đọc sheet đề xuất
-        const response = await gapi.client.sheets.spreadsheets.values.get({
-            spreadsheetId: PROPOSALS_SPREADSHEET_ID,
-            range: `${PROPOSALS_SHEET_NAME}!A:H`,
-        });
-        const proposals = response.result.values;
-        if (proposals && proposals.length > 1) {
-            console.log(`Found ${proposals.length - 1} proposal(s).`);
-            const headers = proposals[0].map(h => String(h).toLowerCase().trim());
-            
-            // --- PHẦN CẬP NHẬT BẮT ĐẦU TỪ ĐÂY ---
-            const parentIdIdx = headers.indexOf('parentid');
-            const nameIdx = headers.indexOf('name');
-            const proposalIdIdx = headers.indexOf('proposalid');
 
-            // Kiểm tra xem các cột quan trọng có tồn tại không
-            if (parentIdIdx === -1 || nameIdx === -1 || proposalIdIdx === -1) {
-                console.error("LỖI CẤU HÌNH SHEET 'Dexuat': Không tìm thấy một trong các cột bắt buộc: 'parentId', 'name', 'proposalId'. Vui lòng kiểm tra lại tên cột trong Google Sheet.");
-                alert("Lỗi cấu hình sheet đề xuất. Vui lòng kiểm tra Console (F12) để biết chi tiết.");
-                return; // Dừng hàm tại đây
-            }
-            // --- KẾT THÚC PHẦN CẬP NHẬT ---
-
-            const birthIdx = headers.indexOf('birth');
-            const deathIdx = headers.indexOf('death');
-            const noteIdx = headers.indexOf('note');
-            const avatarIdx = headers.indexOf('avatarurl');
-
-            for (let i = 1; i < proposals.length; i++) {
-                const row = proposals[i];
-                if (!row || row.length === 0) continue;
-
-                let parentId = row[parentIdIdx];
-                if (parentId && typeof parentId === 'string' && parentId.startsWith("'")) {
-                    parentId = parentId.substring(1);
-                }
-                
-                const parentNode = findById(data, parentId);
-                
-                console.log(`Processing proposal row ${i+1}: parentId '${parentId}'`);
-
-                if (parentNode) {
-                    console.log(`Parent node found for ${parentId}. Attaching proposal node.`);
-                    const proposalNode = {
-                        id: row[proposalIdIdx] || 'proposal_loaded_' + i,
-                        parentId: parentId,
-                        name: row[nameIdx] || 'Chưa đặt tên',
-                        birth: row[birthIdx] || '',
-                        death: row[deathIdx] || '',
-                        note: row[noteIdx] || '',
-                        avatarUrl: row[avatarIdx] || '',
-                        children: [],
-                        isProposal: true,
-                        proposalRow: i + 1
-                    };
-                    if (!parentNode.children) parentNode.children = [];
-                    parentNode.children.push(proposalNode);
-                } else {
-                    console.warn(`Parent node with id '${parentId}' NOT FOUND for proposal in row ${i+1}.`);
-                }
-            }
-        } else {
-            console.log("No proposals found in the sheet.");
-        }
-    } catch (err) {
-        console.error("Không thể tải danh sách đề xuất:", err.result?.error?.message || err.message);
-    }
-}
 async function onAcceptProposal(node) {
     pushHistory();
     
