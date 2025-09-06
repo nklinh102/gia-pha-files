@@ -736,49 +736,59 @@ function openProposalModal(parent) {
   const onEsc = (e) => { if (e.key === 'Escape') cleanup(); };
 
   const onSend = async () => {
-    const payload = {
-      action: 'submit',
-      sheetName: currentSheetName,
-      mainSpreadsheetId: SPREADSHEET_ID,
-      parentId: $('#pParentId').value,
-      parentName: $('#pParentName').textContent,
-      child: {
-        name: ($('#pName').value || '').trim(),
-        birth: ($('#pBirth').value || '').trim(),
-        death: ($('#pDeath').value || '').trim(),
-        note: ($('#pNote').value || '').trim()
-      },
-      submitter: ($('#pSubmitter').value || '').trim(),
-      pageUrl: location.href,
-      ua: navigator.userAgent,
-      ts: new Date().toISOString()
-    };
-
-    if (!payload.child.name) {
-      alert('Vui lòng nhập Họ và tên.');
-      return;
-    }
-
-    btnSend.disabled = true;
-    btnSend.textContent = 'Đang gửi...';
-    try {
-      const res = await fetch(PROPOSAL_WEBAPP_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok || json.ok !== true) throw new Error(json.error || 'Gửi không thành công');
-      alert('✅ Đã gửi đề xuất. Cảm ơn bạn!');
-      cleanup();
-    } catch (err) {
-      console.error(err);
-      alert('❌ Gửi thất bại. Vui lòng thử lại sau.');
-    } finally {
-      btnSend.disabled = false;
-      btnSend.textContent = 'Gửi đề xuất';
-    }
+  const payload = {
+    action: 'submit',
+    sheetName: currentSheetName,
+    mainSpreadsheetId: SPREADSHEET_ID,
+    parentId: $('#pParentId').value,
+    parentName: $('#pParentName').textContent,
+    child: {
+      name: $('#pName').value.trim(),
+      birth: $('#pBirth').value.trim(),
+      death: $('#pDeath').value.trim(),
+      note: $('#pNote').value.trim()
+    },
+    submitter: $('#pSubmitter').value.trim(),
+    pageUrl: location.href,
+    ua: navigator.userAgent,
+    ts: new Date().toISOString()
   };
+
+  if (!payload.child.name) {
+    alert('Vui lòng nhập Họ và tên.');
+    return;
+  }
+
+  btnSend.disabled = true;
+  btnSend.textContent = 'Đang gửi...';
+
+  // Gửi như “simple request” để tránh preflight CORS
+  const form = new URLSearchParams();
+  form.append('payload', JSON.stringify(payload));
+
+  const controller = new AbortController();
+  const to = setTimeout(() => controller.abort(), 12000);
+
+  try {
+    await fetch(PROPOSAL_WEBAPP_URL, {
+      method: 'POST',
+      body: form,         // => Content-Type: application/x-www-form-urlencoded
+      mode: 'no-cors',    // tránh kiểm tra CORS/Preflight
+      signal: controller.signal
+    });
+
+    // Với no-cors, không đọc được phản hồi -> coi như gửi thành công nếu không throw
+    alert('✅ Đã gửi đề xuất. Cảm ơn bạn!');
+    cleanup();
+  } catch (err) {
+    console.error(err);
+    alert('❌ Gửi thất bại. Vui lòng thử lại sau.');
+  } finally {
+    clearTimeout(to);
+    btnSend.disabled = false;
+    btnSend.textContent = 'Gửi đề xuất';
+  }
+};
 
   btnCancel.addEventListener('click', onCancel);
   btnSend.addEventListener('click', onSend);
