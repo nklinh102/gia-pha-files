@@ -147,19 +147,7 @@
                   <div id='selection-avatar' title='Nhấn để sửa thông tin & ảnh'></div>
               </div>
               <div class='actions-grid'>
-                  <button class='btn' id='act-add-child'>
-                      <svg fill='none' height='16' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' viewBox='0 0 24 24' width='16'><path d='M6 3v12'/><path d='M18 9v12'/><path d='M3 15h18'/><path d='M14 21v-5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v5'/></svg>
-                      Thêm con
-                  </button>
-                  <button class='btn' id='act-edit-node'>
-                      <svg fill='none' height='16' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' viewBox='0 0 24 24' width='16'><path d='M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z'/></svg>
-                      Sửa
-                  </button>
-                  <button class='btn' id='act-delete-node' style='background: var(--danger); color: white;'>
-                      <svg fill='none' height='16' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' viewBox='0 0 24 24' width='16'><polyline points='3 6 5 6 21 6'/><path d='M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'/><line x1='10' x2='10' y1='11' y2='17'/><line x1='14' x2='14' y1='11' y2='17'/></svg>
-                      Xóa
-                  </button>
-              </div>
+                  </div>
           </div>
           
           <div class='panel hidden' id='info-panel'>
@@ -188,13 +176,7 @@
                 <strong>Anh em:</strong>
                 <span id='info-brothers'></span>
               </div>
-            </div>
-            <div class="info-actions" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
-              <button class="btn" id="btnProposeChild" style="width: 100%;">Đề xuất thêm con</button>
-              <div class="sub" style="font-size: 11px; text-align: center; margin-top: 6px;">
-                Đề xuất sẽ được gửi tới admin.
               </div>
-            </div>
           </div>
 
         </div>
@@ -219,7 +201,7 @@
           <header>
               <div style='flex-grow: 1;'>
                   <h1>Album Hình Ảnh</h1>
-                  <div class='sub'>Hình ảnh dòng họ</div>
+                  <div class='sub'>Hình ảnh dòng họ Nguyễn Hồng</div>
               </div>
               <button class='btn' id='btnCloseImage' title='Đóng'>&#215;</button>
           </header>
@@ -235,7 +217,7 @@
           <header>
               <div style='flex-grow: 1;'>
                   <h1>Album Âm Thanh</h1>
-                  <div class='sub'>Audio Lịch sử dòng họ</div>
+                  <div class='sub'>Audio Lịch sử dòng họ Nguyễn Hồng</div>
               </div>
               <button class='btn' id='btnCloseAudio' title='Đóng'>&#215;</button>
           </header>
@@ -289,24 +271,6 @@
       </div>
     </div>
     <audio id='global-audio-player'></audio>
-
-    <div class="modal" id="proposal-modal">
-      <div class="dialog">
-        <header><h3>Đề xuất thêm con cho <span id="pParentName"></span></h3></header>
-        <div class="body">
-          <input id="pParentId" type="hidden">
-          <label>Họ và tên<input id="pName" required=""></label>
-          <label>Năm sinh<input id="pBirth"></label>
-          <label>Năm mất<input id="pDeath"></label>
-          <label>Ghi chú<textarea id="pNote" rows="3"></textarea></label>
-          <label>Người gửi (Tên của bạn)<input id="pSubmitter" placeholder="Tên của bạn..."></label>
-        </div>
-        <footer>
-          <button class="btn" id="pCancel">Hủy</button>
-          <button class="btn" id="pSend">Gửi đề xuất</button>
-        </footer>
-      </div>
-    </div>
 
     <script src="script.js" defer></script>
 </body>
