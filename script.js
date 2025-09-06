@@ -312,7 +312,7 @@ function drawNode(node) {
         if(ctx.roundRect) ctx.roundRect(x, y, node._w, node._h, [15]); else ctx.rect(x, y, node._w, node._h);
         ctx.fill(); ctx.stroke();
     }
-    \1if (!isSpecialDepth) {
+    if (!isSpecialDepth) {
         ctx.fillStyle = getCssVar('--card');
         ctx.strokeStyle = isHighlighted ? getCssVar('--accent') : (isSearchFocus ? getCssVar('--warning') : getCssVar('--border'));
         ctx.lineWidth = 2;
