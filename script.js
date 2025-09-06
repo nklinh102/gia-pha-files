@@ -7,7 +7,6 @@ const CLOUDINARY_UPLOAD_PRESET = 'gia_pha_preset';
 const API_KEY = 'AIzaSyAOnCKz1lJjkWvJhWuhc9p0GMXcq3EJ-5U';
 const CLIENT_ID = '44689282931-21nb0br3on3v8dscjfibrfutg7isj9fj.apps.googleusercontent.com';
 const SPREADSHEET_ID = '1z-LGeQo8w0jzF9mg8LD_bMsXKEvtgc_lgY5F-EkTgBY';
-const SUBMISSION_SHEET_NAME = 'PendingMembers'; // Sử dụng tên sheet đã thống nhất
 const ADMIN_EMAIL = 'nklinh102@gmail.com';
 const INDEX_SHEET_NAME = '_index';
 const SETTINGS_SHEET_NAME = 'settings';
@@ -61,8 +60,6 @@ let domNodeIcons = new Map();
 let nodesFlat = [];
 let panAnimId = null;
 
-let pendingProposals = [];
-
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 const app = $('.app');
@@ -75,10 +72,6 @@ const treeDecoration = $('#tree-decoration');
 const ctx = treeCanvas.getContext('2d');
 const authContainer = $('#auth-container');
 const treeSelector = $('#tree-selector');
-const pendingModal = $('#pending-modal');
-const pendingList = $('#pendingList');
-const pendingProposalsBtn = $('#pendingProposals');
-const pendingCountSpan = $('#pendingCount');
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const norm = s => (s||'').normalize('NFD').replace(/\p{M}/gu,'').toLowerCase();
@@ -112,7 +105,7 @@ async function saveTreeData() {
                 (node.children || []).forEach(c => walk(c, node.id));
             })(data);
             await gapi.client.sheets.spreadsheets.values.update({
-                spreadsheetId: SPREADSHEET_ID, range: `${currentSheetName}!A1`, valueInputOption: 'USER_ENTERED',
+                spreadsheetId: SPREADSHEET_ID, range: `${currentSheetName}!A1`, valueInputOption: 'USER-ENTERED',
                 resource: { values: rows }
             });
         }
@@ -699,51 +692,17 @@ async function uploadImageToCloudinary(file) {
 }
 
 function openModal(title, init, onSave) {
-  const modal = $('#modal'), mTitle = $('#mTitle'), mName = $('#mName'), mBirth = $('#mBirth'), mDeath = $('#mDeath'), mNote = $('#mNote'), mAvatar = $('#mAvatar'), mParentId = $('#mParentId');
-  mTitle.textContent = title; 
-  mName.value = init?.name || ''; 
-  mBirth.value = init?.birth || ''; 
-  mDeath.value = init?.death || ''; 
-  mNote.value = init?.note || ''; 
-  mAvatar.value = init?.avatarUrl || '';
-  
-  if (isOwner) {
-    mParentId.parentElement.style.display = 'flex';
-    mParentId.value = init?.parentId || ''; 
-  } else {
-    // Ẩn trường ParentId cho người dùng thường và tự động điền giá trị
-    mParentId.parentElement.style.display = 'none';
-    mParentId.value = init?.parentId || ''; // Vẫn điền giá trị để gửi đi
-  }
-
+  const modal = $('#modal'), mTitle = $('#mTitle'), mName = $('#mName'), mBirth = $('#mBirth'), mDeath = $('#mDeath'), mNote = $('#mNote'), mAvatar = $('#mAvatar');
+  mTitle.textContent = title; mName.value = init?.name || ''; mBirth.value = init?.birth || ''; mDeath.value = init?.death || ''; mNote.value = init?.note || ''; mAvatar.value = init?.avatarUrl || '';
   modal.classList.add('show');
   const btnSave = $('#mSave'), btnCancel = $('#mCancel');
-  function cleanup() { 
-    modal.classList.remove('show'); 
-    btnSave.removeEventListener('click', saveHandler); 
-    btnCancel.removeEventListener('click', close); 
-    modal.removeEventListener('click', outside); 
-    document.removeEventListener('keydown', esc);
-  }
+  function cleanup() { modal.classList.remove('show'); btnSave.removeEventListener('click', saveHandler); btnCancel.removeEventListener('click', close); modal.removeEventListener('click', outside); document.removeEventListener('keydown', esc); }
   function saveHandler() {
       const name = mName.value.trim(); if (!name) { mName.focus(); return; }
-      onSave({ 
-        name, 
-        birth: mBirth.value.trim(), 
-        death: mDeath.value.trim(), 
-        note: mNote.value.trim(), 
-        avatarUrl: mAvatar.value.trim(), 
-        parentId: mParentId.value.trim() 
-      }); 
-      cleanup();
+      onSave({ name, birth: mBirth.value.trim(), death: mDeath.value.trim(), note: mNote.value.trim(), avatarUrl: mAvatar.value.trim() }); cleanup();
   }
-  function close() { cleanup(); } 
-  function outside(e) { if (e.target === modal) close(); } 
-  function esc(e) { if (e.key === 'Escape') close(); }
-  btnSave.addEventListener('click', saveHandler); 
-  btnCancel.addEventListener('click', close); 
-  modal.addEventListener('click', outside); 
-  document.addEventListener('keydown', esc);
+  function close() { cleanup(); } function outside(e) { if (e.target === modal) close(); } function esc(e) { if (e.key === 'Escape') close(); }
+  btnSave.addEventListener('click', saveHandler); btnCancel.addEventListener('click', close); modal.addEventListener('click', outside); document.addEventListener('keydown', esc);
   setTimeout(() => mName.focus(), 50);
 }
 function openConfirm(message, onYes) {
@@ -755,7 +714,7 @@ function openConfirm(message, onYes) {
   yes.addEventListener('click', on); no.addEventListener('click', off); c.addEventListener('click', outside); document.addEventListener('keydown', esc);
 }
 function onAdd(n) { if (!isOwner) return;
-  openModal('Thêm con cho ' + n.name, { parentId: n.id }, (d) => { pushHistory(); if (!n.children) n.children = []; n.children.push({ id: generateHierarchicalId(n), ...d, children: [] }); setUnsavedChanges(true); updateLayout(); scheduleRender(); });
+  openModal('Thêm con cho ' + n.name, {}, (d) => { pushHistory(); if (!n.children) n.children = []; n.children.push({ id: generateHierarchicalId(n), ...d, children: [] }); setUnsavedChanges(true); updateLayout(); scheduleRender(); });
 }
 function onEdit(n) { if (!isOwner) return;
   openModal('Chỉnh sửa: ' + n.name, n, (d) => { 
@@ -787,138 +746,6 @@ function onDel(n) { if (!isOwner) return;
   });
 }
 
-// Thay thế YOUR_WEB_APP_URL bằng URL thật của bạn
-const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycby1gn5oJAGfJwqY4K276vUJ-lOaHYOIyKJS-PAhZGbVLEgaJlkrqsGltmMnuY0uejLuoQ/exec';
-
-async function onProposeMember(prefilledParentId = null) {
-    openModal('Đề xuất thêm thành viên', { parentId: prefilledParentId }, async (d) => {
-        if (!d.name || !d.parentId) {
-            alert('Vui lòng nhập Tên và ID của cha/mẹ.');
-            return;
-        }
-
-        const formData = {
-            parentId: d.parentId,
-            name: d.name,
-            birth: d.birth,
-            death: d.death,
-            note: d.note,
-            avatarUrl: d.avatarUrl,
-        };
-        
-        try {
-            const response = await fetch(WEB_APP_URL, {
-                method: 'POST',
-                body: JSON.stringify(formData),
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            if (response.ok) {
-                alert('Đề xuất của bạn đã được gửi thành công và đang chờ quản trị viên duyệt.');
-            } else {
-                const errorData = await response.json();
-                throw new Error(errorData.message || 'Yêu cầu đến máy chủ thất bại.');
-            }
-        } catch (err) {
-            console.error('Lỗi khi gửi đề xuất:', err);
-            alert('Đã xảy ra lỗi khi gửi đề xuất. Vui lòng thử lại. Chi tiết: ' + err.message);
-        }
-    });
-}
-async function loadPendingProposals() {
-    if (!isOwner) return;
-    try {
-        const response = await gapi.client.sheets.spreadsheets.values.get({
-            spreadsheetId: SPREADSHEET_ID,
-            range: `${SUBMISSION_SHEET_NAME}!A:G`
-        });
-        const rows = response.result.values || [];
-        // Giả sử hàng đầu tiên là tiêu đề, bỏ qua
-        pendingProposals = rows.slice(1).map(row => ({
-            id: row[0],
-            parentId: row[1],
-            name: row[2],
-            birth: row[3],
-            death: row[4],
-            note: row[5],
-            avatarUrl: row[6],
-        }));
-        updatePendingProposalsUI();
-    } catch (err) {
-        console.error('Lỗi khi tải đề xuất:', err);
-    }
-}
-function updatePendingProposalsUI() {
-    pendingCountSpan.textContent = pendingProposals.length;
-    pendingProposalsBtn.style.display = isOwner ? 'flex' : 'none';
-    pendingList.innerHTML = '';
-    if (pendingProposals.length === 0) {
-        pendingList.innerHTML = '<li class="sub" style="text-align:center;">Không có đề xuất nào.</li>';
-        return;
-    }
-    pendingProposals.forEach((p, index) => {
-        const li = document.createElement('li');
-        li.className = 'pending-item';
-        li.innerHTML = `
-            <div class="pending-item-header">
-                <div>
-                    <div class="pending-item-name">${p.name}</div>
-                    <div class="pending-item-parent">Con của: ${p.parentId}</div>
-                </div>
-                <div>ID: ${p.id || 'tự động'}</div>
-            </div>
-            <div class="pending-item-actions">
-                <button class="btn btn-success" data-index="${index}" data-action="approve">Chấp nhận</button>
-                <button class="btn btn-danger" data-index="${index}" data-action="reject">Từ chối</button>
-            </div>
-        `;
-        pendingList.appendChild(li);
-    });
-}
-async function handlePendingAction(e) {
-    const action = e.target.dataset.action;
-    const index = parseInt(e.target.dataset.index, 10);
-    if (action === 'approve') {
-        const proposal = pendingProposals[index];
-        const newId = generateHierarchicalId(findById(data, proposal.parentId));
-        const newMember = {
-            id: newId,
-            parentId: proposal.parentId,
-            name: proposal.name,
-            birth: proposal.birth,
-            death: proposal.death,
-            note: proposal.note,
-            avatarUrl: proposal.avatarUrl,
-            children: []
-        };
-        const parentNode = findById(data, newMember.parentId);
-        if (parentNode) {
-            pushHistory();
-            if (!parentNode.children) parentNode.children = [];
-            parentNode.children.push(newMember);
-            await saveTreeData();
-            setUnsavedChanges(true);
-            updateLayout();
-            scheduleRender();
-            await gapi.client.sheets.spreadsheets.values.batchClear({
-                spreadsheetId: SPREADSHEET_ID,
-                ranges: [`${SUBMISSION_SHEET_NAME}!A${index + 2}:G${index + 2}`]
-            });
-            await loadPendingProposals();
-        } else {
-            alert('Lỗi: Không tìm thấy thành viên cha/mẹ. Vui lòng từ chối đề xuất này.');
-        }
-    } else if (action === 'reject') {
-        await gapi.client.sheets.spreadsheets.values.batchClear({
-            spreadsheetId: SPREADSHEET_ID,
-            ranges: [`${SUBMISSION_SHEET_NAME}!A${index + 2}:G${index + 2}`]
-        });
-        await loadPendingProposals();
-        alert('Đã từ chối đề xuất.');
-    }
-}
 function download(filename, data, type) {
     const a = document.createElement('a');
     let url;
@@ -1178,13 +1005,7 @@ async function loadUserInfo() {
     } else { isOwner = false; authContainer.innerHTML = `Xin chào, <b>${profile.name}</b> (Chế độ xem)<br/><button id="signout-button" class="btn" style="width:100%; margin-top: 8px;">Đăng xuất</button>`; $('#signout-button').onclick = handleSignoutClick; disableEditing(); }
     loadInitialData();
 }
-function updateAuthUI() { 
-    if (!isOwner) { 
-        authContainer.innerHTML = `<button id="signin-button" class="btn" style="width:100%">Đăng nhập để chỉnh sửa</button>`; 
-        $('#signin-button').onclick = handleAuthClick; 
-    } 
-    pendingProposalsBtn.style.display = isOwner ? 'flex' : 'none';
-}
+function updateAuthUI() { if (!isOwner) { authContainer.innerHTML = `<button id="signin-button" class="btn" style="width:100%">Đăng nhập để chỉnh sửa</button>`; $('#signin-button').onclick = handleAuthClick; } }
 async function loadInitialData() {
     if (!gapiInited) return; let sheetData;
     try {
@@ -1222,7 +1043,6 @@ async function loadInitialData() {
         const errorMsg = e?.result?.error?.message || e.message || 'Lỗi không xác định.';
         alert('Không thể tải dữ liệu. Chi tiết: ' + errorMsg); data = null; scheduleRender();
     }
-    await loadPendingProposals();
 }
 async function loadTreeData(sheetName) {
     if (!sheetName) return; currentSheetName = sheetName; document.body.style.cursor = 'wait'; data = null; scheduleRender();
@@ -1244,7 +1064,7 @@ async function saveSettingsToSheet() {
     if (!isOwner) return; const bgUrl = $('#bgUrlInput').value.trim(); const currentGapX = $('#gapXSlider').value; const newTitle = appTitle.textContent.trim();
     try {
         await gapi.client.sheets.spreadsheets.values.update({
-            spreadsheetId: SPREADSHEET_ID, range: `${SETTINGS_SHEET_NAME}!A1:B7`, valueInputOption: 'USER_ENTERED',
+            spreadsheetId: SPREADSHEET_ID, range: `${SETTINGS_SHEET_NAME}!A1:B7`, valueInputOption: 'USER-ENTERED',
             resource: { values: [ ['bg_url', bgUrl], ['gap_x', currentGapX], ['tree_title', newTitle], ['decoration_visible', decorationSettings.visible], ['decoration_size', decorationSettings.size], ['decoration_distance', decorationSettings.distance], ['decoration_url', decorationSettings.url] ] }
         });
     } catch(err) { console.error("Lỗi khi lưu cài đặt:", err); }
@@ -1381,7 +1201,7 @@ function init() {
   });
   
   treeCanvas.addEventListener('wheel', (e) => {
-    e.preventDefault(); const rect = canvasContainer.getBoundingClientRect();
+    e.preventDefault(); const rect = treeCanvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left, mouseY = e.clientY - rect.top;
     const worldXBefore = (mouseX - panX) / scale, worldYBefore = (mouseY - panY) / scale;
     const newScale = clamp(scale * (1 + e.deltaY * -0.001), .1, 5);
@@ -1395,7 +1215,7 @@ function init() {
   hammer.on('panmove', (e) => { panX = startPanX + e.deltaX; panY = startPanY + e.deltaY; scheduleRender(); });
   hammer.on('pinchstart', (e) => { startScale = scale; });
   hammer.on('pinchmove', (e) => {
-      const newScale = clamp(startScale * e.scale, 0.1, 5); const rect = canvasContainer.getBoundingClientRect();
+      const newScale = clamp(startScale * e.scale, 0.1, 5); const rect = treeCanvas.getBoundingClientRect();
       const pX = e.center.x - rect.left, pY = e.center.y - rect.top;
       const wX = (pX - panX) / scale, wY = (pY - panY) / scale;
       panX = pX - wX * newScale; panY = pY - wY * newScale; scale = newScale;
@@ -1438,17 +1258,15 @@ function init() {
   $('#act-edit-node').addEventListener('click', () => { if (highlightedNodeId) { const node = findById(data, highlightedNodeId); if (node) onEdit(node); } });
   $('#act-delete-node').addEventListener('click', () => { if (highlightedNodeId) { const node = findById(data, highlightedNodeId); if (node) onDel(node); } });
 
-  const proposeChildBtn = $('#propose-child-btn');
-  if (proposeChildBtn) {
-      proposeChildBtn.addEventListener('click', () => {
-          if (highlightedNodeId) {
-              const node = findById(data, highlightedNodeId);
-              if (node) {
-                  onProposeMember(node.id);
-              }
-          }
-      });
-  }
+  $('#mAvatarFile').onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const imageUrl = await uploadImageToCloudinary(file);
+    if (imageUrl) {
+      $('#mAvatar').value = imageUrl;
+    }
+  };
+
 }
 
 function updateControlsUI() {
