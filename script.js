@@ -12,7 +12,7 @@ const ADMIN_EMAIL = 'nklinh102@gmail.com';
 const INDEX_SHEET_NAME = '_index';
 const SETTINGS_SHEET_NAME = 'settings';
 const MEDIA_SHEET_NAME = 'Media';
-const PENDING_SHEET_NAME = 'DeXuat'; // Tên sheet trong SUBMISSION_SHEET_ID
+const PENDING_SHEET_NAME = 'Dexuat'; // Tên sheet trong SPREADSHEET_ID cũ
 
 // ===================================================================
 
@@ -712,8 +712,9 @@ function openModal(title, init, onSave) {
     mParentId.parentElement.style.display = 'flex';
     mParentId.value = init?.parentId || ''; 
   } else {
+    // Ẩn trường ParentId cho người dùng thường và tự động điền giá trị
     mParentId.parentElement.style.display = 'none';
-    mParentId.value = init?.parentId || '';
+    mParentId.value = init?.parentId || ''; // Vẫn điền giá trị để gửi đi
   }
 
   modal.classList.add('show');
