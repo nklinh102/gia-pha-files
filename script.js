@@ -11,7 +11,7 @@ const ADMIN_EMAIL = 'nklinh102@gmail.com';
 const INDEX_SHEET_NAME = '_index';
 const SETTINGS_SHEET_NAME = 'settings';
 const MEDIA_SHEET_NAME = 'Media';
-const PROPOSAL_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbxngHH01as4d2rqMVUztd_AK1k6kgfZOhtFxiaphdFlxY4AcblBgnPcx3l-VZAqxOWU-A/exec';
+const PROPOSAL_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbz1uoi3WjjtpueOxn1KZA1B3I9g3d0W0LadzGscl-a9D3GEY03f42_CNNDTamAsYznK2g/exec';
 
 // ===================================================================
 
