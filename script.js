@@ -1428,42 +1428,73 @@ function onProposeChild(parentNode) {
     });
 }
 
-async function saveProposalToSheet(nodeData) {
-    // Đây là hàm đã được thay đổi để sử dụng Web App
-    if (!PROPOSAL_WEB_APP_URL || PROPOSAL_WEB_APP_URL === 'DÁN_WEB_APP_URL_CỦA_BẠN_VÀO_ĐÂY') {
-        console.error("Lỗi cấu hình: Vui lòng dán Web App URL vào hằng số PROPOSAL_WEB_APP_URL.");
-        alert("Lỗi cấu hình. Không thể gửi đề xuất.");
-        return;
-    }
-    
+// Thay thế hàm này
+async function loadAndApplyProposals() {
+    if (!data || !isOwner) return;
+    console.log(`Admin mode: Loading proposals for tree '${currentSheetName}'...`);
     try {
-        const payload = {
-            parentId: nodeData.parentId,
-            name: nodeData.name,
-            birth: nodeData.birth,
-            death: nodeData.death,
-            note: nodeData.note,
-            avatarUrl: nodeData.avatarUrl,
-            proposalId: nodeData.id
-        };
-
-        // Sử dụng fetch để gửi dữ liệu đến Web App
-        const response = await fetch(PROPOSAL_WEB_APP_URL, {
-            method: 'POST',
-            body: JSON.stringify(payload),
-            headers: {
-                'Content-Type': 'text/plain;charset=utf-8', // Apps Script doPost cần kiểu này
-            },
+        const response = await gapi.client.sheets.spreadsheets.values.get({
+            spreadsheetId: PROPOSALS_SPREADSHEET_ID,
+            range: `${PROPOSALS_SHEET_NAME}!A:I`, // Mở rộng vùng đọc ra cột I
         });
-        
-        console.log("Proposal data sent to Web App.");
+        const proposals = response.result.values;
+        if (proposals && proposals.length > 1) {
+            const headers = proposals[0].map(h => String(h).toLowerCase().trim());
+            
+            const treeIdIdx = headers.indexOf('treeid');
+            const parentIdIdx = headers.indexOf('parentid');
+            const nameIdx = headers.indexOf('name');
+            const proposalIdIdx = headers.indexOf('proposalid');
 
+            if (treeIdIdx === -1 || parentIdIdx === -1) {
+                console.error("LỖI CẤU HÌNH SHEET 'Dexuat': Không tìm thấy cột 'treeId' hoặc 'parentId'.");
+                return;
+            }
+
+            let loadedCount = 0;
+            for (let i = 1; i < proposals.length; i++) {
+                const row = proposals[i];
+                if (!row || row.length === 0) continue;
+
+                const proposalTreeId = row[treeIdIdx];
+
+                // --- LOGIC QUAN TRỌNG: CHỈ XỬ LÝ NẾU ĐỀ XUẤT THUỘC GIA PHẢ HIỆN TẠI ---
+                if (proposalTreeId === currentSheetName) {
+                    let parentId = row[parentIdIdx];
+                    if (parentId && typeof parentId === 'string' && parentId.startsWith("'")) {
+                        parentId = parentId.substring(1);
+                    }
+                    
+                    const parentNode = findById(data, parentId);
+                    if (parentNode) {
+                        loadedCount++;
+                        const proposalNode = {
+                            id: row[proposalIdIdx] || 'proposal_loaded_' + i,
+                            parentId: parentId,
+                            name: row[nameIdx] || 'Chưa đặt tên',
+                            birth: row[headers.indexOf('birth')] ? row[headers.indexOf('birth')] : '',
+                            death: row[headers.indexOf('death')] ? row[headers.indexOf('death')] : '',
+                            note: row[headers.indexOf('note')] ? row[headers.indexOf('note')] : '',
+                            avatarUrl: row[headers.indexOf('avatarurl')] ? row[headers.indexOf('avatarurl')] : '',
+                            children: [],
+                            isProposal: true,
+                            proposalRow: i + 1
+                        };
+                        if (!parentNode.children) parentNode.children = [];
+                        parentNode.children.push(proposalNode);
+                    } else {
+                        console.warn(`Parent node with id '${parentId}' NOT FOUND for proposal in row ${i+1}.`);
+                    }
+                }
+            }
+            console.log(`Found and loaded ${loadedCount} proposal(s) for this tree.`);
+        } else {
+            console.log("No proposals found in the sheet.");
+        }
     } catch (err) {
-        console.error("Lỗi nghiêm trọng khi gửi đề xuất đến Web App:", err);
-        alert("Đã xảy ra lỗi khi gửi đề xuất của bạn. Vui lòng kiểm tra Console (F12) để biết chi tiết.");
+        console.error("Không thể tải danh sách đề xuất:", err.result?.error?.message || err.message);
     }
 }
-
 async function loadAndApplyProposals() {
     if (!data || !isOwner) return; // Chỉ Admin mới tải đề xuất
     console.log("Admin mode: Loading proposals from sheet...");
