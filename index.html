@@ -173,6 +173,18 @@
                 <strong>Giáp / Đời:</strong>
                 <span id='info-generation'></span>
               </div>
+
+              <div class='info-actions' style='margin-top:10px'>
+                <button class='btn' id='btnProposeChild' title='Gửi đề xuất thêm con'>
+                  <svg fill="none" height="16" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="16">
+                    <path d="M12 5v14M5 12h14"></path>
+                  </svg>
+                  Đề xuất thêm con
+                </button>
+                <div class='sub' style='font-size:12px;opacity:.8;margin-top:6px'>
+                  Yêu cầu sẽ được gửi để admin duyệt
+                </div>
+              </div>
               <div class='info-item inline-label' id='info-birth-item'>
                 <strong>Ngày sinh: </strong>
                 <span id='info-birth'></span>
@@ -286,6 +298,39 @@
     <audio id='global-audio-player'></audio>
 
     <script src="script.js" defer></script>
+
+    <div class='modal' id='proposal-modal'>
+      <div class='dialog' style='max-width:480px'>
+        <header>
+          <h3>Đề xuất thêm con cho <span id='pParentName'></span></h3>
+        </header>
+        <div class='body'>
+          <input type='hidden' id='pParentId'>
+          <label>Họ và tên
+            <input id='pName' placeholder='Nguyễn Văn ...' required>
+          </label>
+          <div style='display:grid;grid-template-columns:1fr 1fr;gap:8px'>
+            <label>Năm sinh
+              <input id='pBirth' placeholder='VD: 1990'>
+            </label>
+            <label>Năm mất
+              <input id='pDeath' placeholder=''>
+            </label>
+          </div>
+          <label>Ghi chú
+            <textarea id='pNote' placeholder='Quan hệ, nguồn xác thực...'></textarea>
+          </label>
+          <label>Thông tin người gửi (tên/sđt/email)
+            <input id='pSubmitter' placeholder='Tùy chọn'>
+          </label>
+        </div>
+        <footer>
+          <button class='btn' id='pCancel'>Hủy</button>
+          <button class='btn' id='pSend'>Gửi đề xuất</button>
+        </footer>
+      </div>
+    </div>
+
 </body>
 </html>
 
