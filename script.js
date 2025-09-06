@@ -7,12 +7,12 @@ const CLOUDINARY_UPLOAD_PRESET = 'gia_pha_preset';
 const API_KEY = 'AIzaSyAOnCKz1lJjkWvJhWuhc9p0GMXcq3EJ-5U';
 const CLIENT_ID = '44689282931-21nb0br3on3v8dscjfibrfutg7isj9fj.apps.googleusercontent.com';
 const SPREADSHEET_ID = '1z-LGeQo8w0jzF9mg8LD_bMsXKEvtgc_lgY5F-EkTgBY';
-const SUBMISSION_SHEET_ID = '1vlg9btMR-kP_m2gbYy4AoJ-Z41qzxpkERMBCx4LyxqU'; // ID của sheet đề xuất mới
+const SUBMISSION_SHEET_ID = '1vlg9btMR-kP_m2gbYy4AoJ-Z41qzxpkERMBCx4LyxqU';
 const ADMIN_EMAIL = 'nklinh102@gmail.com';
 const INDEX_SHEET_NAME = '_index';
 const SETTINGS_SHEET_NAME = 'settings';
 const MEDIA_SHEET_NAME = 'Media';
-const PENDING_SHEET_NAME = 'PendingMembers'; // Tên sheet trong SPREADSHEET_ID cũ
+const PENDING_SHEET_NAME = 'PendingMembers';
 
 // ===================================================================
 
@@ -701,25 +701,49 @@ async function uploadImageToCloudinary(file) {
 
 function openModal(title, init, onSave) {
   const modal = $('#modal'), mTitle = $('#mTitle'), mName = $('#mName'), mBirth = $('#mBirth'), mDeath = $('#mDeath'), mNote = $('#mNote'), mAvatar = $('#mAvatar'), mParentId = $('#mParentId');
-  mTitle.textContent = title; mName.value = init?.name || ''; mBirth.value = init?.birth || ''; mDeath.value = init?.death || ''; mNote.value = init?.note || ''; mAvatar.value = init?.avatarUrl || '';
+  mTitle.textContent = title; 
+  mName.value = init?.name || ''; 
+  mBirth.value = init?.birth || ''; 
+  mDeath.value = init?.death || ''; 
+  mNote.value = init?.note || ''; 
+  mAvatar.value = init?.avatarUrl || '';
   
-  // Chỉ hiển thị trường Parent ID cho admin
   if (isOwner) {
     mParentId.parentElement.style.display = 'flex';
+    mParentId.value = init?.parentId || ''; 
   } else {
+    // Ẩn trường ParentId cho người dùng thường
     mParentId.parentElement.style.display = 'none';
   }
-  mParentId.value = init?.parentId || ''; // Tự động điền parentId
 
   modal.classList.add('show');
   const btnSave = $('#mSave'), btnCancel = $('#mCancel');
-  function cleanup() { modal.classList.remove('show'); btnSave.removeEventListener('click', saveHandler); btnCancel.removeEventListener('click', close); modal.removeEventListener('click', outside); document.removeEventListener('keydown', esc); }
+  function cleanup() { 
+    modal.classList.remove('show'); 
+    btnSave.removeEventListener('click', saveHandler); 
+    btnCancel.removeEventListener('click', close); 
+    modal.removeEventListener('click', outside); 
+    document.removeEventListener('keydown', esc);
+  }
   function saveHandler() {
       const name = mName.value.trim(); if (!name) { mName.focus(); return; }
-      onSave({ name, birth: mBirth.value.trim(), death: mDeath.value.trim(), note: mNote.value.trim(), avatarUrl: mAvatar.value.trim(), parentId: mParentId.value.trim() }); cleanup();
+      onSave({ 
+        name, 
+        birth: mBirth.value.trim(), 
+        death: mDeath.value.trim(), 
+        note: mNote.value.trim(), 
+        avatarUrl: mAvatar.value.trim(), 
+        parentId: mParentId.value.trim() 
+      }); 
+      cleanup();
   }
-  function close() { cleanup(); } function outside(e) { if (e.target === modal) close(); } function esc(e) { if (e.key === 'Escape') close(); }
-  btnSave.addEventListener('click', saveHandler); btnCancel.addEventListener('click', close); modal.addEventListener('click', outside); document.addEventListener('keydown', esc);
+  function close() { cleanup(); } 
+  function outside(e) { if (e.target === modal) close(); } 
+  function esc(e) { if (e.key === 'Escape') close(); }
+  btnSave.addEventListener('click', saveHandler); 
+  btnCancel.addEventListener('click', close); 
+  modal.addEventListener('click', outside); 
+  document.addEventListener('keydown', esc);
   setTimeout(() => mName.focus(), 50);
 }
 function openConfirm(message, onYes) {
@@ -764,7 +788,7 @@ function onDel(n) { if (!isOwner) return;
 }
 
 // Thay thế YOUR_WEB_APP_URL bằng URL thật của bạn
-const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycby1gn5oJAGfJwqY4K276vUJ-lOaHYOIyKJS-PAhZGbVLEgaJlkrqsGltmMnuY0uejLuoQ/exec';
+const WEB_APP_URL = 'YOUR_WEB_APP_URL';
 
 async function onProposeMember(prefilledParentId = null) {
     openModal('Đề xuất thêm thành viên', { parentId: prefilledParentId }, async (d) => {
@@ -806,7 +830,7 @@ async function loadPendingProposals() {
     if (!isOwner) return;
     try {
         const response = await gapi.client.sheets.spreadsheets.values.get({
-            spreadsheetId: SUBMISSION_SHEET_ID,
+            spreadsheetId: SPREADSHEET_ID,
             range: `${PENDING_SHEET_NAME}!A:G`
         });
         const rows = response.result.values || [];
@@ -1389,12 +1413,7 @@ function init() {
   updateControlsUI();
   $('#toggleDecoration').onchange = (e) => { decorationSettings.visible = e.target.checked; setUnsavedChanges(true); scheduleRender(); };
   decorationSizeSlider.addEventListener('input', (e) => { decorationSettings.size = parseInt(e.target.value, 10); decorationSizeLabel.textContent = decorationSettings.size; setUnsavedChanges(true); scheduleRender(); });
-  decorationDistanceSlider.addEventListener('input', (e) => {
-    decorationSettings.distance = parseInt(e.target.value, 10);
-    decorationDistanceLabel.textContent = decorationSettings.distance; // Sửa lỗi ở đây
-    setUnsavedChanges(true);
-    scheduleRender();
-  });
+  decorationDistanceSlider.addEventListener('input', (e) => { decorationSettings.distance = parseInt(e.target.value, 10); decorationDistanceLabel.textContent = decorationSettings.distance; setUnsavedChanges(true); scheduleRender(); });
   $('#decorationUrlInput').addEventListener('input', (e) => { 
     decorationSettings.url = e.target.value; 
     treeDecoration.src = e.target.value;
@@ -1440,7 +1459,6 @@ function updateControlsUI() {
         decorationSizeSlider.value = decorationSettings.size;
         decorationSizeLabel.textContent = decorationSettings.size;
         decorationDistanceSlider.value = decorationSettings.distance;
-        // Dòng này đã được sửa lỗi chính tả
         decorationDistanceLabel.textContent = decorationSettings.distance;
         decorationUrlInput.value = decorationSettings.url;
     }
