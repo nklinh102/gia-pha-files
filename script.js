@@ -11,7 +11,11 @@ const ADMIN_EMAIL = 'nklinh102@gmail.com';
 const INDEX_SHEET_NAME = '_index';
 const SETTINGS_SHEET_NAME = 'settings';
 const MEDIA_SHEET_NAME = 'Media';
-const PROPOSAL_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbz1uoi3WjjtpueOxn1KZA1B3I9g3d0W0LadzGscl-a9D3GEY03f42_CNNDTamAsYznK2g/exec';
+
+// === START: THAY THẾ APPS SCRIPT BẰNG FORMSPREE ===
+// Dán URL Formspree của bạn vào đây
+const FORMSPREE_ENDPOINT = 'https://formspree.io/f/mgvlrwvy'; 
+// === END: THAY THẾ APPS SCRIPT BẰNG FORMSPREE ===
 
 // ===================================================================
 
@@ -302,16 +306,6 @@ function drawNode(node) {
     }
 
     const isSpecialDepth = node.depth === 0 || node.depth === 1;
-    const isPending = node.status === 'PENDING';
-    if (isPending) {
-        // Highlight pending nodes with orange card regardless of depth
-        ctx.fillStyle = '#ffb347';
-        ctx.strokeStyle = '#e67e22';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        if(ctx.roundRect) ctx.roundRect(x, y, node._w, node._h, [15]); else ctx.rect(x, y, node._w, node._h);
-        ctx.fill(); ctx.stroke();
-    }
     if (!isSpecialDepth) {
         ctx.fillStyle = getCssVar('--card');
         ctx.strokeStyle = isHighlighted ? getCssVar('--accent') : (isSearchFocus ? getCssVar('--warning') : getCssVar('--border'));
@@ -1348,202 +1342,10 @@ if ('serviceWorker' in navigator) {
       });
   });
 }
-
-
-
-// ===== Proposal (submit/approve) =====
-(function(){
-  const $ = (s)=>document.querySelector(s);
-  function openProposalModal(parent){
-    $('#pParentName').textContent = parent.name || '—';
-    $('#pParentId').value = parent.id;
-    $('#pName').value=''; $('#pBirth').value=''; $('#pDeath').value=''; $('#pNote').value=''; $('#pSubmitter').value='';
-    $('#proposal-modal').classList.add('show');
-  }
-  function closeProposalModal(){ $('#proposal-modal').classList.remove('show'); }
-
-  // Hook button in info panel
-  const btnPropose = document.getElementById('btnProposeChild');
-  if(btnPropose){
-    btnPropose.addEventListener('click', ()=>{
-      if(!highlightedNodeId){ alert('Hãy nhấn vào thẻ tên trên cây trước.'); return; }
-      const parent = findById(data, highlightedNodeId);
-      if(!parent){ alert('Không tìm thấy người được chọn.'); return; }
-      openProposalModal(parent);
-    });
-  }
-  const cancelBtn = document.getElementById('pCancel');
-  if(cancelBtn){ cancelBtn.addEventListener('click', closeProposalModal); }
-
-  const sendBtn = document.getElementById('pSend');
-  if(sendBtn){
-    sendBtn.addEventListener('click', async ()=>{
-      const payload = {
-        action: 'submit',
-        sheetName: currentSheetName || 'Sheet1',
-        parentId: document.getElementById('pParentId').value,
-        parentName: document.getElementById('pParentName').textContent,
-        child: {
-          name: document.getElementById('pName').value.trim(),
-          birth: document.getElementById('pBirth').value.trim(),
-          death: document.getElementById('pDeath').value.trim(),
-          note:  document.getElementById('pNote').value.trim()
-        },
-        submitter: document.getElementById('pSubmitter').value.trim(),
-        pageUrl: location.href,
-        ua: navigator.userAgent,
-        ts: new Date().toISOString()
-      };
-      if(!payload.child.name){ alert('Vui lòng nhập Họ và tên.'); return; }
-      let proposalId = 'pending-'+Date.now();
-      try{
-        const res = await fetch(PROPOSAL_WEBAPP_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        try{ const j = await res.json(); if(j && j.ok && j.proposalId) proposalId = j.proposalId; }catch{}
-      }catch(err){
-        try{
-          const form = new URLSearchParams();
-          form.append('payload', JSON.stringify(payload));
-          await fetch(PROPOSAL_WEBAPP_URL, { method:'POST', body:form, mode:'no-cors' });
-        }catch(e){ console.warn('Gửi đề xuất (fallback) lỗi:', e); }
-      }
-
-      // Show pending child on tree (local overlay)
-      const parent = findById(data, payload.parentId);
-      if(parent){
-        if(!Array.isArray(parent.children)) parent.children = [];
-        const tempNode = {
-          id: payload.parentId + '.temp.' + Date.now(),
-          parentId: payload.parentId,
-          name: payload.child.name,
-          birth: payload.child.birth,
-          death: payload.child.death,
-          note: payload.child.note,
-          status: 'PENDING',
-          proposalId,
-          children: []
-        };
-        parent.children.push(tempNode);
-        try{ updateLayout(); }catch(e){}
-        scheduleRender();
-      }
-      alert('✅ Đã gửi đề xuất! Node mới sẽ hiển thị màu cam cho tới khi admin chấp nhận.');
-      closeProposalModal();
-    });
-  }
-
-  // Owner approve button in selection actions
-  const approveBtn = document.getElementById('act-approve-proposal');
-  if(approveBtn){
-    approveBtn.addEventListener('click', async ()=>{
-      if(!highlightedNodeId){ alert('Chọn một thẻ đang chờ duyệt.'); return; }
-      const node = findById(data, highlightedNodeId);
-      if(!node || node.status !== 'PENDING' || !node.proposalId){
-        alert('Thẻ hiện tại không phải đề xuất hoặc thiếu mã đề xuất.');
-        return;
-      }
-      try{
-        const res = await fetch(PROPOSAL_WEBAPP_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action:'approve', proposalId: node.proposalId })
-        });
-        const j = await res.json();
-        if(!j.ok){ alert('Lỗi duyệt: ' + (j.error||'unknown')); return; }
-        node.status = 'APPROVED';
-        if(j.newId) node.id = j.newId;
-        try{ updateLayout(); }catch{}
-        scheduleRender();
-        alert('✔ Đã chấp nhận và đồng bộ vào sheet chính.');
-      }catch(err){
-        console.error(err);
-        alert('Lỗi gọi approve: ' + err.message);
-      }
-    });
-  }
-
-  // Extend updateSelectionActions to toggle approve button visibility
-  const _updateSelectionActions = updateSelectionActions;
-  window.updateSelectionActions = function(){
-    _updateSelectionActions();
-    const btn = document.getElementById('act-approve-proposal');
-    if(!btn) return;
-    if(!highlightedNodeId || !isOwner){ btn.style.display='none'; return; }
-    const n = findById(data, highlightedNodeId);
-    btn.style.display = (n && n.status === 'PENDING') ? 'block' : 'none';
-  };
-})();
-
-
-// === Overlay pending badges on nodes for Admin (uses #node-icons-container) ===
-(function(){
-  const container = document.getElementById('node-icons-container');
-  if(!container) return;
-
-  function walk(n, acc){
-    if(!n) return;
-    acc.push(n);
-    (n.children||[]).forEach(c=>walk(c, acc));
-  }
-
-  function paintBadges(){
-    if(!container) return;
-    container.innerHTML = '';
-    if(!isOwner || !data) return;
-    const nodes = []; walk(data, nodes);
-
-    nodes.forEach(n=>{
-      if(n.status === 'PENDING' && typeof n._x === 'number' && typeof n._y === 'number'){
-        const el = document.createElement('div');
-        el.className = 'node-icon badge-pending';
-        el.textContent = '!';
-        // convert world coords to screen coords
-        const px = panX + (n._x + (n._w/2) - 12) * scale;
-        const py = panY + (n._y - (n._h/2) + 4) * scale;
-        el.style.left = px + 'px';
-        el.style.top = py + 'px';
-        el.style.position = 'absolute';
-        el.style.pointerEvents = 'auto'; // override container's pointer-events
-        el.title = 'Đề xuất đang chờ duyệt';
-
-        el.addEventListener('click', (e)=>{
-          e.stopPropagation();
-          highlightedNodeId = n.id;
-          updateSelectionActions && updateSelectionActions();
-          updateInfoPanel && updateInfoPanel(highlightedNodeId);
-          // gợi ý nơi duyệt
-          const btn = document.getElementById('act-approve-proposal');
-          if(btn && btn.style.display !== 'none'){
-            btn.animate([{transform:'scale(1)'},{transform:'scale(1.08)'},{transform:'scale(1)'}], {duration:400});
-          }
-        });
-
-        container.appendChild(el);
-      }
-    });
-  }
-
-  // hook sau mỗi lần render/scheduleRender
-  if (typeof window.render === 'function') {
-    const _render = window.render;
-    window.render = function(){
-      _render.apply(this, arguments);
-      try { paintBadges(); } catch(e){ console.warn(e); }
-    };
-  } else if (typeof window.scheduleRender === 'function') {
-    const _scheduleRender = window.scheduleRender;
-    window.scheduleRender = function(){
-      _scheduleRender.apply(this, arguments);
-      requestAnimationFrame(()=>{ try { paintBadges(); } catch(e){} });
-    };
-  } else {
-    // fallback: vẽ sau khi DOM ready
-    document.addEventListener('DOMContentLoaded', ()=> setTimeout(paintBadges, 200));
-  }
-
-  // expose for manual refresh if cần
-  window.__paintPendingBadges = paintBadges;
-})();
+hãy xóa các thành phần không cần thiết đi, chỉ để lại những thứ sau:
+1. Giao diện sáng tối
+2. Sơ đồ gia phả
+3. Thêm con, sửa, xóa
+4. nhập và xuất file csv
+5. Tên cây phả đồ
+giữ nguyên các file
