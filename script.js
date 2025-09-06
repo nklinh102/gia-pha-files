@@ -1465,6 +1465,8 @@ async function saveProposalToSheet(nodeData) {
 }
 
 
+// THAY THẾ TOÀN BỘ HÀM loadAndApplyProposals CŨ BẰNG HÀM NÀY
+
 async function loadAndApplyProposals() {
     if (!data || !isOwner) return; // Chỉ Admin mới tải đề xuất
     console.log("Admin mode: Loading proposals from sheet...");
@@ -1490,7 +1492,14 @@ async function loadAndApplyProposals() {
                 const row = proposals[i];
                 if (!row || row.length === 0) continue;
 
-                const parentId = row[parentIdIdx];
+                // --- PHẦN SỬA LỖI BẮT ĐẦU TỪ ĐÂY ---
+                let parentId = row[parentIdIdx];
+                if (parentId && typeof parentId === 'string' && parentId.startsWith("'")) {
+                    // Loại bỏ dấu nháy đơn ở đầu nếu có
+                    parentId = parentId.substring(1);
+                }
+                // --- KẾT THÚC PHẦN SỬA LỖI ---
+                
                 const parentNode = findById(data, parentId);
                 
                 console.log(`Processing proposal row ${i+1}: parentId '${parentId}'`);
