@@ -7,19 +7,22 @@ const CLOUDINARY_UPLOAD_PRESET = 'gia_pha_preset';
 const API_KEY = 'AIzaSyAOnCKz1lJjkWvJhWuhc9p0GMXcq3EJ-5U';
 const CLIENT_ID = '44689282931-21nb0br3on3v8dscjfibrfutg7isj9fj.apps.googleusercontent.com';
 const SPREADSHEET_ID = '1z-LGeQo8w0jzF9mg8LD_bMsXKEvtgc_lgY5F-EkTgBY';
+const PROPOSALS_SPREADSHEET_ID = '15Glu750DS5C-pZvXURHsjz8ixawvLrrW4wSwKMkq6q0'; // <-- ĐÃ THÊM
 const ADMIN_EMAIL = 'nklinh102@gmail.com';
 const INDEX_SHEET_NAME = '_index';
 const SETTINGS_SHEET_NAME = 'settings';
 const MEDIA_SHEET_NAME = 'Media';
-
-// VIỆC CẦN LÀM: Dán URL Formspree của bạn vào đây
-const FORMSPREE_ENDPOINT = 'https://formspree.io/f/mgvlrwvy'; 
+const PROPOSALS_SHEET_NAME = 'Dexuat'; // <-- ĐÃ THÊM
 
 // ===================================================================
+
 // ====== Trạng thái & Hằng số ======
-// ===================================================================
 const LS_KEY_PREFIX = 'familyTree.v13.';
 const THEME_KEY = 'familyTreeTheme.v13';
+const TITLE_KEY = 'familyTreeTitle.v13';
+const MINIMAP_KEY = 'familyTreeMinimap.v13';
+const ACCENT_KEY = 'familyTreeAccent.v13';
+const GAPX_KEY = 'familyTreeGapX.v13';
 const GEN1_W = 400, GEN1_H = 90;
 const GEN2_W = 330, GEN2_H = 85;
 const GEN345_W = 200, GEN345_H = 72;
@@ -27,6 +30,7 @@ const GEN6PLUS_W = 60, GEN6PLUS_H = 180;
 const VERTICAL_THRESHOLD = 5;
 let gapX = 40;
 const DEFAULT_GAP_Y = 50;
+
 const MIN_QUERY = 2;
 const SEARCH_DEBOUNCE = 450;
 
@@ -73,7 +77,6 @@ const treeSelector = $('#tree-selector');
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const norm = s => (s||'').normalize('NFD').replace(/\p{M}/gu,'').toLowerCase();
-
 function setUnsavedChanges(isDirty) {
     hasUnsavedChanges = isDirty;
     const saveBtn = $('#btnSaveChanges');
@@ -100,6 +103,7 @@ async function saveTreeData() {
         if (data) {
             const rows = [['id', 'parentId', 'name', 'birth', 'death', 'note', 'avatarUrl']];
             (function walk(node, parentId = '') {
+                if (node.isProposal) return; // Bỏ qua các node đề xuất khi lưu
                 rows.push([`'${node.id}`, parentId ? `'${parentId}` : '', node.name || '', node.birth || '', node.death || '', node.note || '', node.avatarUrl || '']);
                 (node.children || []).forEach(c => walk(c, node.id));
             })(data);
@@ -281,6 +285,7 @@ function drawNode(node) {
     const path = findPathToRoot(highlightedNodeId);
     const isHighlighted = highlightedNodeId && path.some(p => p.id === node.id);
     const isSearchFocus = node.isSearchFocus;
+    const isProposal = node.isProposal === true; // <-- ĐÃ THÊM
     
     ctx.save();
     if (isSearchFocus) {
@@ -290,7 +295,7 @@ function drawNode(node) {
     }
 
     ctx.shadowBlur = isHighlighted ? 20 : (isSearchFocus ? 30 : 15);
-    ctx.shadowColor = isHighlighted ? getCssVar('--accent') : (isSearchFocus ? getCssVar('--warning') : 'rgba(0,0,0,.5)');
+    ctx.shadowColor = isProposal ? getCssVar('--warning') : (isHighlighted ? getCssVar('--accent') : (isSearchFocus ? getCssVar('--warning') : 'rgba(0,0,0,.5)')); // <-- ĐÃ THAY ĐỔI
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 5;
     
@@ -302,8 +307,8 @@ function drawNode(node) {
     const isSpecialDepth = node.depth === 0 || node.depth === 1;
     if (!isSpecialDepth) {
         ctx.fillStyle = getCssVar('--card');
-        ctx.strokeStyle = isHighlighted ? getCssVar('--accent') : (isSearchFocus ? getCssVar('--warning') : getCssVar('--border'));
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = isProposal ? getCssVar('--warning') : (isHighlighted ? getCssVar('--accent') : (isSearchFocus ? getCssVar('--warning') : getCssVar('--border'))); // <-- ĐÃ THAY ĐỔI
+        ctx.lineWidth = isProposal ? 3 : 2; // <-- ĐÃ THAY ĐỔI
         ctx.beginPath();
         if(ctx.roundRect) ctx.roundRect(x, y, node._w, node._h, [15]); else ctx.rect(x, y, node._w, node._h);
         ctx.fill();
@@ -474,15 +479,18 @@ function resizeCanvas() {
     }
 }
 
+// <-- HÀM ĐÃ ĐƯỢC THAY ĐỔI HOÀN TOÀN -->
 function updateSelectionActions() {
     const panel = $('#selection-actions');
-    if (!panel) return;
+    const actionsGrid = panel.querySelector('.actions-grid');
+    if (!panel || !actionsGrid) return;
+
+    actionsGrid.innerHTML = ''; // Xóa các nút cũ
 
     if (highlightedNodeId && isOwner) {
         const node = findById(data, highlightedNodeId);
         if (node) {
             $('#selection-name-value').textContent = node.name;
-            
             const avatarEl = $('#selection-avatar');
             if (node.avatarUrl) {
                 avatarEl.style.backgroundImage = `url(${node.avatarUrl})`;
@@ -491,46 +499,100 @@ function updateSelectionActions() {
                 avatarEl.style.backgroundImage = 'none';
                 avatarEl.innerHTML = '&#43;';
             }
-            
             avatarEl.onclick = () => onEditAvatar(node);
 
+            if (node.isProposal) {
+                // Hiển thị nút Chấp nhận / Từ chối
+                const acceptBtn = document.createElement('button');
+                acceptBtn.className = 'btn btn-accept';
+                acceptBtn.innerHTML = `Chấp nhận`;
+                acceptBtn.onclick = () => onAcceptProposal(node);
+
+                const rejectBtn = document.createElement('button');
+                rejectBtn.className = 'btn btn-reject';
+                rejectBtn.innerHTML = `Từ chối`;
+                rejectBtn.onclick = () => onRejectProposal(node);
+
+                actionsGrid.append(acceptBtn, rejectBtn);
+
+            } else {
+                // Hiển thị các nút mặc định
+                const addChildBtn = document.createElement('button');
+                addChildBtn.className = 'btn';
+                addChildBtn.id = 'act-add-child';
+                addChildBtn.innerHTML = `<svg fill='none' height='16' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' viewBox='0 0 24 24' width='16'><path d='M6 3v12'/><path d='M18 9v12'/><path d='M3 15h18'/><path d='M14 21v-5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v5'/></svg> Thêm con`;
+                addChildBtn.onclick = () => onAdd(node);
+
+                const editBtn = document.createElement('button');
+                editBtn.className = 'btn';
+                editBtn.id = 'act-edit-node';
+                editBtn.innerHTML = `<svg fill='none' height='16' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' viewBox='0 0 24 24' width='16'><path d='M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z'/></svg> Sửa`;
+                editBtn.onclick = () => onEdit(node);
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'btn';
+                deleteBtn.id = 'act-delete-node';
+                deleteBtn.style.background = 'var(--danger)';
+                deleteBtn.style.color = 'white';
+                deleteBtn.innerHTML = `<svg fill='none' height='16' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' viewBox='0 0 24 24' width='16'><polyline points='3 6 5 6 21 6'/><path d='M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'/><line x1='10' x2='10' y1='11' y2='17'/><line x1='14' x2='14' y1='11' y2='17'/></svg> Xóa`;
+                deleteBtn.onclick = () => onDel(node);
+
+                actionsGrid.append(addChildBtn, editBtn, deleteBtn);
+            }
             panel.classList.remove('hidden');
         } else {
-             panel.classList.add('hidden');
+            panel.classList.add('hidden');
         }
     } else {
         panel.classList.add('hidden');
     }
 }
 
+
 function getGiap(node) {
-    if (!data || !node || node.depth < 1) return 'N/A';
+    if (!data || !node || node.depth < 1) {
+        return 'N/A';
+    }
+
     let current = node;
     let parent = findParent(data, current.id);
+
     while (parent && current.depth > 1) {
         current = parent;
         parent = findParent(data, current.id);
     }
+    
     const gen2Ancestor = current;
+
     if (gen2Ancestor && gen2Ancestor.depth === 1 && data.children) {
         const giapIndex = data.children.findIndex(child => child.id === gen2Ancestor.id);
-        if (giapIndex !== -1) return giapIndex + 1;
+        if (giapIndex !== -1) {
+            return giapIndex + 1;
+        }
     }
+
     return 'N/A';
 }
 
+// <-- HÀM ĐÃ ĐƯỢC THAY ĐỔI -->
 function updateInfoPanel(nodeId) {
     const panel = $('#info-panel');
     if (!panel) return;
-    if (!nodeId || isOwner) {
+    
+    const existingBtn = $('#act-propose-child');
+    if(existingBtn) existingBtn.remove();
+
+    if (!nodeId || isOwner) { // Ẩn với owner
         panel.classList.add('hidden');
         return;
     }
+
     const node = findById(data, nodeId);
     if (!node) {
         panel.classList.add('hidden');
         return;
     }
+
     $('#info-name').textContent = node.name || 'N/A';
     const avatarContainer = $('#info-avatar');
     if (node.avatarUrl) {
@@ -551,13 +613,37 @@ function updateInfoPanel(nodeId) {
         }
     }
     $('#info-brothers').textContent = `${olderBrothers} anh trai và ${youngerBrothers} em trai`;
-    $('#info-birth-item').style.display = node.birth ? 'block' : 'none';
-    if(node.birth) $('#info-birth').textContent = node.birth;
-    $('#info-death-item').style.display = node.death ? 'block' : 'none';
-    if(node.death) $('#info-death').textContent = node.death;
-
+    const birthItem = $('#info-birth-item');
+    if (node.birth) {
+        $('#info-birth').textContent = node.birth;
+        birthItem.style.display = 'block';
+    } else {
+        birthItem.style.display = 'none';
+    }
+    const deathItem = $('#info-death-item');
+    if (node.death) {
+        $('#info-death').textContent = node.death;
+        deathItem.style.display = 'block';
+    } else {
+        deathItem.style.display = 'none';
+    }
     panel.classList.remove('hidden');
+
+    // Thêm nút đề xuất cho người dùng thường
+    if (!isOwner && node) {
+        const proposalBtn = document.createElement('button');
+        proposalBtn.id = 'act-propose-child';
+        proposalBtn.className = 'btn';
+        proposalBtn.style.width = '100%';
+        proposalBtn.style.marginTop = '10px';
+        proposalBtn.style.background = 'var(--success)';
+        proposalBtn.style.color = 'white';
+        proposalBtn.innerHTML = `<svg fill='none' height='16' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' viewBox='0 0 24 24' width='16'><path d='M12 5v14m-7-7h14'/></svg> Đề xuất thêm con`;
+        proposalBtn.onclick = () => onProposeChild(node);
+        panel.querySelector('.info-grid').appendChild(proposalBtn);
+    }
 }
+
 
 function getCoordsFromEvent(e) {
     const rect = treeCanvas.getBoundingClientRect();
@@ -572,10 +658,16 @@ function getCoordsFromEvent(e) {
 function getNodeAtPoint(worldX, worldY) {
     let found = null;
     function check(node) {
-        const x1 = node._x - node._w / 2, y1 = node._y - node._h / 2;
-        const x2 = node._x + node._w / 2, y2 = node._y + node._h / 2;
-        if (worldX >= x1 && worldX <= x2 && worldY >= y1 && worldY <= y2) found = node;
-        if (!found) (node.children || []).forEach(check);
+        const x1 = node._x - node._w / 2;
+        const y1 = node._y - node._h / 2;
+        const x2 = node._x + node._w / 2;
+        const y2 = node._y + node._h / 2;
+        if (worldX >= x1 && worldX <= x2 && worldY >= y1 && worldY <= y2) {
+            found = node;
+        }
+        if (!found) {
+            (node.children || []).forEach(check);
+        }
     }
     if (data) check(data);
     return found;
@@ -584,7 +676,13 @@ function handleCanvasClick(e) {
     e.preventDefault();
     const { worldX, worldY } = getCoordsFromEvent(e);
     const node = getNodeAtPoint(worldX, worldY);
-    highlightedNodeId = (node && highlightedNodeId === node.id) ? null : (node ? node.id : null);
+
+    if (node) {
+        highlightedNodeId = (highlightedNodeId === node.id) ? null : node.id;
+    } else {
+        highlightedNodeId = null;
+    }
+    
     updateSelectionActions();
     updateInfoPanel(highlightedNodeId);
     scheduleRender();
@@ -603,9 +701,9 @@ function updateStats() {
   const statsContainer = $('#stats-content');
   if (!data) { statsContainer.innerHTML = ''; return; }
   const counts = [];
-  (function traverse(node, depth) { if (!node) return; counts[depth] = (counts[depth] || 0) + 1; (node.children || []).forEach(child => traverse(child, depth + 1)); })(data, 0);
+  (function traverse(node, depth) { if (!node) return; if(!node.isProposal) {counts[depth] = (counts[depth] || 0) + 1;} (node.children || []).forEach(child => traverse(child, depth + 1)); })(data, 0);
   let html = ''; let total = 0;
-  counts.forEach((count, index) => { html += `<div><span>Đời ${index + 1}</span> <strong>${count}</strong></div>`; total += count; });
+  counts.forEach((count, index) => { if(count > 0) {html += `<div><span>Đời ${index + 1}</span> <strong>${count}</strong></div>`; total += count;} });
   html += `<div class="total-row"><span><strong>Tổng cộng</strong></span> <strong>${total}</strong></div>`;
   statsContainer.innerHTML = html;
 }
@@ -615,15 +713,24 @@ async function uploadImageToCloudinary(file) {
     formData.append('file', file);
     formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
     formData.append('folder', 'avatar');
+
     const saveBtn = $('#mSave');
     const originalBtnText = saveBtn.textContent;
     saveBtn.disabled = true;
     saveBtn.textContent = 'Đang tải ảnh...';
+
+    const apiUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+
     try {
-        const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
-            method: 'POST', body: formData,
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            body: formData,
         });
-        if (!response.ok) throw new Error('Tải ảnh lên Cloudinary thất bại.');
+
+        if (!response.ok) {
+            throw new Error('Tải ảnh lên Cloudinary thất bại. Vui lòng thử lại.');
+        }
+
         const data = await response.json();
         return data.secure_url;
     } catch (error) {
@@ -663,7 +770,11 @@ function onAdd(n) { if (!isOwner) return;
 }
 function onEdit(n) { if (!isOwner) return;
   openModal('Chỉnh sửa: ' + n.name, n, (d) => { 
-    pushHistory(); Object.assign(n, d); setUnsavedChanges(true); updateLayout(); scheduleRender(); 
+    pushHistory(); 
+    Object.assign(n, d); 
+    setUnsavedChanges(true);
+    updateLayout();
+    scheduleRender(); 
   });
 }
 function onEditAvatar(n) { if (!isOwner) return;
@@ -679,22 +790,37 @@ function onDel(n) { if (!isOwner) return;
     if (data.id === n.id) { data = null; }
     else { const p = findParent(data, n.id); if (p && p.children) p.children = p.children.filter(c => c.id !== n.id); }
     highlightedNodeId = null;
-    updateSelectionActions(); updateInfoPanel(null); setUnsavedChanges(true); updateLayout(); scheduleRender();
+    updateSelectionActions();
+    updateInfoPanel(null);
+    setUnsavedChanges(true);
+    updateLayout();
+    scheduleRender();
   });
 }
 
 function download(filename, data, type) {
     const a = document.createElement('a');
-    const blob = new Blob(["\uFEFF" + data], { type: type || 'application/octet-stream' });
-    a.href = URL.createObjectURL(blob);
+    let url;
+    if (typeof data === 'string' && (data.startsWith('data:') || data.startsWith('blob:'))) {
+        url = data;
+    } else {
+        const blob = new Blob([data], { type: type || 'application/octet-stream' });
+        url = URL.createObjectURL(blob);
+    }
+    a.href = url;
     a.download = filename;
+    document.body.appendChild(a);
     a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 100);
+    if (typeof url !== 'string' || !url.startsWith('data:')) {
+        setTimeout(() => URL.revokeObjectURL(url), 100);
+    }
+    document.body.removeChild(a);
 }
 function toCSV() {
-  if(!data) return ''; const rows = [['id', 'parentId', 'name', 'birth', 'death', 'note', 'avatarUrl']];
+  if(!data) return ''; const rows = [['id', 'parentId', 'name', 'birth', 'death', 'note']];
   (function walk(node, parentId = '') {
-      rows.push([node.id, parentId, node.name, node.birth, node.death, node.note, node.avatarUrl].map(v => { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }));
+      if(node.isProposal) return; // Không xuất các node đề xuất
+      rows.push([node.id, parentId, node.name, node.birth, node.death, node.note].map(v => { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }));
      (node.children || []).forEach(c => walk(c, node.id));
   })(data); return rows.map(row => row.join(',')).join('\n');
 }
@@ -707,23 +833,22 @@ function fromCSV(text) {
     lines.forEach((line, index) => {
         try {
             const values = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.replace(/^"|"$/g, '').replace(/""/g, ''));
-            const id = values[idx('id')]; const parentId = values[idx('parentid')];
-            if (!id) { console.error(`Lỗi Dòng ${index + 2}: không có ID.`); hasError = true; return; }
+            const id = values[idx('id')]; const parentId = values[idx('parentid')]; const name = values[idx('name')];
+            if (!id && !parentId) return; if (!id) { console.error(`Lỗi Dòng ${index + 2}: "${name}" không có ID.`); hasError = true; return; }
             if (map.has(id)) { console.error(`Lỗi Dòng ${index + 2}: ID "${id}" trùng lặp.`); hasError = true; return; }
             const node = { id, parentId, name: values[idx('name')], birth: values[idx('birth')], death: values[idx('death')], note: values[idx('note')], avatarUrl: values[idx('avatarurl')], children: [] };
             map.set(id, node); allNodes.push(node);
         } catch (e) { console.warn('Bỏ qua dòng CSV không hợp lệ:', line); }
     });
     allNodes.forEach(node => {
-        const { id, parentId } = node;
-        if (parentId && map.has(parentId)) { map.get(parentId).children.push(node); }
-        else if (!parentId) { if (root) hasError = true; root = node; }
+        const { id, parentId, name } = node; if (id === parentId) { console.error(`Lỗi: "${name}" (ID: ${id}) có parentId trỏ về chính nó.`); hasError = true; return; }
+        if (parentId) { if (map.has(parentId)) { map.get(parentId).children.push(node); } else { console.warn(`Cảnh báo: "${name}" (ID: ${id}) có parentId "${parentId}" không tồn tại.`); } }
+        else { if (root) { console.error('Lỗi: Tìm thấy nhiều hơn một nút gốc.'); hasError = true; } root = node; }
     });
-    if (hasError) alert('Cảnh báo: Dữ liệu có lỗi. Sơ đồ có thể không đúng. Nhấn F12 và xem Console để biết chi tiết.');
-    if (!root && allNodes.length > 0) return allNodes[0];
-    return root;
+    if (hasError) { alert('Cảnh báo: Dữ liệu có lỗi. Sơ đồ có thể không đúng. Nhấn F12 và xem Console để biết chi tiết.'); }
+    if (!root && allNodes.length > 0) { console.error("Không tìm thấy nút gốc. Lấy tạm node đầu tiên."); return allNodes[0]; } return root;
 }
-$('#btnExportCSV').onclick = () => { if (!data) return alert('Chưa có dữ liệu'); download('gia-pha.csv', toCSV(), 'text/csv;charset=utf-8'); };
+$('#btnExportCSV').onclick = () => { if (!data) return alert('Chưa có dữ liệu'); download('gia-pha.csv', '\uFEFF' + toCSV(), 'text/csv;charset=utf-8'); };
 $('#btnImportCSV').onclick = () => { if (!isOwner) return; $('#fileImportCSV').click(); };
 $('#fileImportCSV').onchange = async (e) => {
   const f = e.target.files[0]; if (!f) return;
@@ -738,6 +863,7 @@ function generateSVGString() {
   const pad = 40; const w = bb.maxX - bb.minX + pad * 2; const h = bb.maxY - bb.minY + pad * 2;
   let paths = '', nodesSVG = '';
   (function buildContent(n) {
+      if(n.isProposal) return;
       (n.children || []).forEach(c => { const x1 = n._x, y1 = n._y + n._h / 2, x2 = c._x, y2 = c._y - c._h / 2, midY = (y1 + y2) / 2; paths += `<path d="M ${x1} ${y1} V ${midY} H ${x2} V ${y2}" />`; });
       const name = (n.name||'').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       const meta = [n.birth||'', n.death?('– '+n.death):''].join(' ').trim();
@@ -752,36 +878,46 @@ function generateSVGString() {
     <g>${paths}</g><g>${nodesSVG}</g></svg>`;
 }
 
-async function convertSVGtoJPG(svgString) {
+async function convertSVGtoJPG(svgString, quality = 0.9) { 
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     const img = new Image();
-    const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' }); 
     const url = URL.createObjectURL(svgBlob);
-    await new Promise((resolve, reject) => {
-        img.onload = resolve; img.onerror = reject; img.src = url;
+    const loadImagePromise = new Promise((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = (err) => reject(err);
+        img.src = url;
     });
+    await loadImagePromise;
     URL.revokeObjectURL(url);
-    canvas.width = img.width; canvas.height = img.height;
-    ctx.fillStyle = getCssVar('--bg'); ctx.fillRect(0, 0, canvas.width, canvas.height);
+    canvas.width = img.width;
+    canvas.height = img.height;
+    ctx.fillStyle = getCssVar('--bg'); // Sử dụng màu nền của theme
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0);
-    return canvas.toDataURL('image/jpeg', 0.9);
+    return canvas.toDataURL('image/jpeg', quality);
 }
 
 $('#btnExportSVG').onclick = () => { const svgString = generateSVGString(); if (svgString) download('gia-pha.svg', svgString, 'image/svg+xml'); else alert('Chưa có dữ liệu.'); };
 $('#btnExportJPG').onclick = async () => {
     const btn = $('#btnExportJPG');
-    btn.disabled = true; btn.textContent = 'Đang xử lý...';
+    btn.disabled = true;
+    btn.textContent = 'Đang xử lý...';
     try {
         const svgString = generateSVGString();
-        if (!svgString) { alert('Chưa có dữ liệu để xuất.'); return; }
-        const jpgDataUrl = await convertSVGtoJPG(svgString);
+        if (!svgString) {
+            alert('Chưa có dữ liệu để xuất.');
+            return;
+        }
+        const jpgDataUrl = await convertSVGtoJPG(svgString); 
         download('gia-pha.jpg', jpgDataUrl);
     } catch (err) {
         console.error('Lỗi chuyển đổi SVG sang JPG:', err);
         alert('Đã xảy ra lỗi khi chuyển đổi file.');
     } finally {
-        btn.disabled = false; btn.textContent = 'Xuất JPG';
+        btn.disabled = false;
+        btn.textContent = 'Xuất JPG';
     }
 };
 
@@ -794,16 +930,38 @@ searchInput.addEventListener('input', (e) => {
   clearTimeout(searchTimeout);
   const v = (e.target.value || '').trim();
   btnClearSearch.style.display = v ? 'block' : 'none';
-  if (v.length < MIN_QUERY) { clearSearchFlags(); scheduleRender(); return; }
+  if (v.length < MIN_QUERY) {
+    clearSearchFlags();
+    scheduleRender();
+    return;
+  }
   searchTimeout = setTimeout(() => applySearch(false), SEARCH_DEBOUNCE);
 });
-btnClearSearch.addEventListener('click', () => {
-  searchInput.value = ''; btnClearSearch.style.display = 'none';
-  clearSearchFlags(); scheduleRender(); searchInput.focus();
-});
-searchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); applySearch(true); } });
 
-function clearSearchFlags() { if (data) nodesFlat.forEach(n => { n.isSearchMatch = false; n.isSearchFocus = false; }); }
+btnClearSearch.addEventListener('click', () => {
+  searchInput.value = '';
+  btnClearSearch.style.display = 'none';
+  clearSearchFlags();
+  scheduleRender();
+  searchInput.focus();
+});
+
+searchInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+      e.preventDefault();
+      applySearch(true);
+  }
+});
+
+function clearSearchFlags() {
+  if (data) {
+      nodesFlat.forEach(n => {
+          n.isSearchMatch = false;
+          n.isSearchFocus = false;
+      });
+  }
+}
+
 function applySearch(shouldCenter) {
   const q = norm(searchInput.value || '');
   let first = null;
@@ -811,9 +969,14 @@ function applySearch(shouldCenter) {
     const m = !!(n._norm && n._norm.includes(q));
     n.isSearchMatch = m;
     n.isSearchFocus = false;
-    if (m && !first) { first = n; n.isSearchFocus = true; }
+    if (m && !first) {
+      first = n;
+      n.isSearchFocus = true;
+    }
   });
-  if (first && shouldCenter) centerOnNode(first, { animate: true });
+  if (first && shouldCenter) {
+      centerOnNode(first, { animate: true });
+  }
   scheduleRender();
 }
 
@@ -825,7 +988,8 @@ function centerOnNode(node, opts = { animate: true }) {
     if (!opts.animate) {
         panX = end.x; panY = end.y; scale = end.s;
         $('#zoomReset').textContent = Math.round(scale * 100) + '%';
-        scheduleRender(); return;
+        scheduleRender();
+        return;
     }
     if (panAnimId) cancelAnimationFrame(panAnimId);
     const start = { x: panX, y: panY, s: scale };
@@ -839,8 +1003,11 @@ function centerOnNode(node, opts = { animate: true }) {
         scale = start.s + (end.s - start.s) * e;
         $('#zoomReset').textContent = Math.round(scale * 100) + '%';
         scheduleRender();
-        if (p < 1) panAnimId = requestAnimationFrame(step);
-        else panAnimId = null;
+        if (p < 1) {
+            panAnimId = requestAnimationFrame(step);
+        } else {
+            panAnimId = null;
+        }
     };
     panAnimId = requestAnimationFrame(step);
 }
@@ -931,6 +1098,7 @@ async function loadInitialData() {
         alert('Không thể tải dữ liệu. Chi tiết: ' + errorMsg); data = null; scheduleRender();
     }
 }
+// <-- HÀM ĐÃ ĐƯỢC THAY ĐỔI -->
 async function loadTreeData(sheetName) {
     if (!sheetName) return; currentSheetName = sheetName; document.body.style.cursor = 'wait'; data = null; scheduleRender();
     try {
@@ -942,26 +1110,24 @@ async function loadTreeData(sheetName) {
             console.error("Lỗi layout:", err); if (err.message.toLowerCase().includes("stack")) { alert("Lỗi Hiển Thị: Dữ liệu bị lặp vòng tròn. Vui lòng kiểm tra file Google Sheet."); }
             else { alert("Lỗi khi hiển thị cây: " + err.message); } data = null;
         }
+        
+        if (isOwner) {
+            await loadAndApplyProposals();
+            updateLayout(); 
+        }
+
         fitToScreen(); savedTitle = appTitle.textContent; localStorage.setItem(LS_KEY_PREFIX + 'lastSelectedSheet', sheetName);
         document.body.style.cursor = 'default'; history = []; future = []; setUnsavedChanges(false);
         if (isOwner) { $('#btnUndo').disabled = true; $('#btnRedo').disabled = true; }
     }
 }
+
 async function saveSettingsToSheet() {
-    if (!isOwner) return;
-    const values = [
-        ['bg_url', $('#bgUrlInput').value.trim()],
-        ['gap_x', $('#gapXSlider').value],
-        ['tree_title', appTitle.textContent.trim()],
-        ['decoration_visible', decorationSettings.visible],
-        ['decoration_size', decorationSettings.size],
-        ['decoration_distance', decorationSettings.distance],
-        ['decoration_url', decorationSettings.url]
-    ];
+    if (!isOwner) return; const bgUrl = $('#bgUrlInput').value.trim(); const currentGapX = $('#gapXSlider').value; const newTitle = appTitle.textContent.trim();
     try {
         await gapi.client.sheets.spreadsheets.values.update({
             spreadsheetId: SPREADSHEET_ID, range: `${SETTINGS_SHEET_NAME}!A1:B7`, valueInputOption: 'USER-ENTERED',
-            resource: { values }
+            resource: { values: [ ['bg_url', bgUrl], ['gap_x', currentGapX], ['tree_title', newTitle], ['decoration_visible', decorationSettings.visible], ['decoration_size', decorationSettings.size], ['decoration_distance', decorationSettings.distance], ['decoration_url', decorationSettings.url] ] }
         });
     } catch(err) { console.error("Lỗi khi lưu cài đặt:", err); }
 }
@@ -980,24 +1146,22 @@ function populateAudioSidebar() {
     const audioPlaylist = $('#media-audio-playlist'); const globalAudioPlayer = $('#global-audio-player'); audioPlaylist.innerHTML = '';
     if (allAudios.length > 0) {
         allAudios.forEach((item, index) => {
-            const listItem = document.createElement('li'); listItem.className = 'playlist-item'; listItem.title = item.name;
-            listItem.dataset.index = index;
+            const listItem = document.createElement('li'); listItem.className = 'playlist-item'; listItem.title = item.name; listItem.dataset.index = index;
             listItem.innerHTML = `<div class="progress-bar"></div><span class="play-icon">▶</span> <span class="track-name">${item.name}</span>`;
             listItem.addEventListener('click', (e) => {
-                const clickedItem = e.currentTarget;
+                e.stopPropagation(); const clickedItem = e.currentTarget; const directAudioUrl = item.url;
                 if (e.target.matches('.play-icon, .track-name')) {
                     const wasPlaying = clickedItem.classList.contains('playing');
-                    $$('.playlist-item.playing').forEach(el => { el.classList.remove('playing'); el.querySelector('.play-icon').textContent = '▶'; });
-                    if (wasPlaying) { globalAudioPlayer.pause(); } 
-                    else {
+                    if (wasPlaying) { globalAudioPlayer.pause(); } else {
+                        $$('.playlist-item.playing').forEach(el => { el.classList.remove('playing'); el.querySelector('.play-icon').textContent = '▶'; });
                         clickedItem.classList.add('playing'); clickedItem.querySelector('.play-icon').textContent = '❚❚';
-                        if (globalAudioPlayer.src !== item.url) { globalAudioPlayer.src = item.url; }
-                        globalAudioPlayer.play().catch(err => { console.error("Lỗi phát audio:", err); });
+                        if (globalAudioPlayer.src !== directAudioUrl) { globalAudioPlayer.src = directAudioUrl; }
+                        globalAudioPlayer.play().catch(err => { console.error("Lỗi phát audio:", err); alert("Không thể phát file audio này."); clickedItem.classList.remove('playing'); clickedItem.querySelector('.play-icon').textContent = '▶'; });
                     }
                 } else {
-                    if (!globalAudioPlayer.src || !globalAudioPlayer.duration) return;
-                    const rect = clickedItem.getBoundingClientRect();
-                    globalAudioPlayer.currentTime = ((e.clientX - rect.left) / clickedItem.clientWidth) * globalAudioPlayer.duration;
+                    if (!globalAudioPlayer.src || globalAudioPlayer.src !== directAudioUrl || !globalAudioPlayer.duration) return;
+                    const rect = clickedItem.getBoundingClientRect(); const clickX = e.clientX - rect.left; const width = clickedItem.clientWidth;
+                    const seekRatio = clickX / width; globalAudioPlayer.currentTime = seekRatio * globalAudioPlayer.duration;
                 }
             });
             audioPlaylist.appendChild(listItem);
@@ -1008,12 +1172,14 @@ function showMedia(type, index) {
     if (type !== 'image' || allImages.length === 0) return; currentImageIndex = index;
     const mediaViewer = $('#media-viewer'); const mediaContent = $('#media-content');
     function updateImageViewer() {
-        const item = allImages[currentImageIndex];
-        mediaContent.innerHTML = `<img src="${item.url}" style="max-height: 80vh; max-width: 100%; object-fit: contain;">
-                                  <div id="gallery-nav"><button id="gallery-prev">&lt;</button><button id="gallery-next">&gt;</button></div>`;
+        const item = allImages[currentImageIndex]; const img = document.createElement('img');
+        img.style.maxHeight = '80vh'; img.style.maxWidth = '100%'; img.style.objectFit = 'contain';
+        const nav = document.createElement('div'); nav.id = 'gallery-nav'; nav.innerHTML = `<button id="gallery-prev">&lt;</button><button id="gallery-next">&gt;</button>`;
+        mediaContent.innerHTML = ''; mediaContent.append(img, nav);
         $('#gallery-prev').onclick = (e) => { e.stopPropagation(); currentImageIndex = (currentImageIndex - 1 + allImages.length) % allImages.length; updateImageViewer(); };
         $('#gallery-next').onclick = (e) => { e.stopPropagation(); currentImageIndex = (currentImageIndex + 1) % allImages.length; updateImageViewer(); };
-        $('#media-title').textContent = item.name;
+        img.onerror = () => { mediaContent.innerHTML = `<div style="padding: 2rem; color: var(--danger);">Không thể tải hình ảnh.</div>`; };
+        img.src = item.url; $('#media-title').textContent = item.name;
     }
     mediaViewer.classList.add('show'); updateImageViewer();
 }
@@ -1023,13 +1189,23 @@ function getCssVar(name) { return getComputedStyle(document.body).getPropertyVal
 
 function loadGoogleAPIs() {
   const gapiScript = document.createElement('script');
-  gapiScript.src = 'https://apis.google.com/js/api.js'; gapiScript.defer = true;
-  gapiScript.onload = () => { if (typeof gapiLoaded === 'function') gapiLoaded(); };
+  gapiScript.src = 'https://apis.google.com/js/api.js';
+  gapiScript.defer = true;
+  gapiScript.onload = () => {
+    if (typeof gapiLoaded === 'function') {
+      gapiLoaded();
+    }
+  };
   document.head.appendChild(gapiScript);
 
   const gsiScript = document.createElement('script');
-  gsiScript.src = 'https://accounts.google.com/gsi/client'; gsiScript.defer = true;
-  gsiScript.onload = () => { if (typeof gisLoaded === 'function') gisLoaded(); };
+  gsiScript.src = 'https://accounts.google.com/gsi/client';
+  gsiScript.defer = true;
+  gsiScript.onload = () => {
+    if (typeof gisLoaded === 'function') {
+      gisLoaded();
+    }
+  };
   document.head.appendChild(gsiScript);
 }
 
@@ -1040,16 +1216,33 @@ function init() {
   treeCanvas.addEventListener('mousemove', handleCanvasMouseMove);
 
   const overlay = $('#overlay');
-  $('#btnToggleSidebar').onclick = () => app.classList.toggle('sidebar-collapsed');
-  
-  const searchContainer = $('#search-container');
-  $('#btnToggleSearch').addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (searchContainer.classList.toggle('search-expanded')) searchInput.focus();
-  });
-  searchInput.addEventListener('keydown', (e) => { if (e.key === 'Escape') searchContainer.classList.remove('search-expanded'); });
-  document.addEventListener('click', (e) => { if (!searchContainer.contains(e.target)) searchContainer.classList.remove('search-expanded'); });
+  const toggleSidebar = () => app.classList.toggle('sidebar-collapsed');
+  $('#btnToggleSidebar').onclick = toggleSidebar;
 
+  const searchContainer = $('#search-container');
+  const btnToggleSearch = $('#btnToggleSearch');
+
+  btnToggleSearch.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isExpanded = searchContainer.classList.toggle('search-expanded');
+      if (isExpanded) {
+          searchInput.focus();
+      }
+  });
+  
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      searchContainer.classList.remove('search-expanded');
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!searchContainer.contains(e.target)) {
+      searchContainer.classList.remove('search-expanded');
+    }
+  });
+
+  
   $('#gapXSlider').addEventListener('input', (e) => {
       gapX = parseInt(e.target.value, 10);
       $('#gapValueLabel').textContent = gapX;
@@ -1069,6 +1262,15 @@ function init() {
       }
   });
   
+  treeCanvas.addEventListener('wheel', (e) => {
+    e.preventDefault(); const rect = treeCanvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left, mouseY = e.clientY - rect.top;
+    const worldXBefore = (mouseX - panX) / scale, worldYBefore = (mouseY - panY) / scale;
+    const newScale = clamp(scale * (1 + e.deltaY * -0.001), .1, 5);
+    panX = mouseX - worldXBefore * newScale; panY = mouseY - worldYBefore * newScale;
+    scale = newScale; $('#zoomReset').textContent = Math.round(scale * 100) + '%';
+    scheduleRender();
+  }, { passive: false });
   const hammer = new Hammer(treeCanvas); hammer.get('pinch').set({ enable: true });
   let startPanX = 0, startPanY = 0, startScale = 1;
   hammer.on('panstart', (e) => { startPanX = panX; startPanY = panY; });
@@ -1081,68 +1283,73 @@ function init() {
       panX = pX - wX * newScale; panY = pY - wY * newScale; scale = newScale;
       $('#zoomReset').textContent = Math.round(scale * 100) + '%'; scheduleRender();
   });
-  treeCanvas.addEventListener('wheel', (e) => {
-    e.preventDefault(); const rect = treeCanvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left, mouseY = e.clientY - rect.top;
-    const worldXBefore = (mouseX - panX) / scale, worldYBefore = (mouseY - panY) / scale;
-    const newScale = clamp(scale * (1 + e.deltaY * -0.001), .1, 5);
-    panX = mouseX - worldXBefore * newScale; panY = mouseY - worldYBefore * newScale;
-    scale = newScale; $('#zoomReset').textContent = Math.round(scale * 100) + '%';
-    scheduleRender();
-  }, { passive: false });
 
   $('#themeSelector').addEventListener('change', (e) => applyTheme(e.target.value));
-  applyTheme(localStorage.getItem(THEME_KEY) || 'dark');
+  const savedTheme = localStorage.getItem(THEME_KEY) || 'dark';
+  applyTheme(savedTheme);
   
   $('#bgUrlInput').addEventListener('input', () => setUnsavedChanges(true));
   $('#appTitle').addEventListener('blur', () => { if(isOwner) setUnsavedChanges(true); });
   
+  const decorationSizeSlider = $('#decorationSizeSlider'), decorationSizeLabel = $('#decorationSizeLabel');
+  const decorationDistanceSlider = $('#decorationDistanceSlider'), decorationDistanceLabel = $('#decorationDistanceLabel');
   updateControlsUI();
   $('#toggleDecoration').onchange = (e) => { decorationSettings.visible = e.target.checked; setUnsavedChanges(true); scheduleRender(); };
-  $('#decorationSizeSlider').addEventListener('input', (e) => { decorationSettings.size = parseInt(e.target.value, 10); $('#decorationSizeLabel').textContent = decorationSettings.size; setUnsavedChanges(true); scheduleRender(); });
-  $('#decorationDistanceSlider').addEventListener('input', (e) => { decorationSettings.distance = parseInt(e.target.value, 10); $('#decorationDistanceLabel').textContent = decorationSettings.distance; setUnsavedChanges(true); scheduleRender(); });
+  decorationSizeSlider.addEventListener('input', (e) => { decorationSettings.size = parseInt(e.target.value, 10); decorationSizeLabel.textContent = decorationSettings.size; setUnsavedChanges(true); scheduleRender(); });
+  decorationDistanceSlider.addEventListener('input', (e) => { decorationSettings.distance = parseInt(e.target.value, 10); decorationDistanceLabel.textContent = decorationSettings.distance; setUnsavedChanges(true); scheduleRender(); });
   $('#decorationUrlInput').addEventListener('input', (e) => { 
-    decorationSettings.url = e.target.value; treeDecoration.src = e.target.value; setUnsavedChanges(true); 
+    decorationSettings.url = e.target.value; 
+    treeDecoration.src = e.target.value;
+    setUnsavedChanges(true); 
   });
   
   const imageSidebar = $('#image-sidebar'), audioSidebar = $('#audio-sidebar'), globalAudioPlayer = $('#global-audio-player');
   const closeAllMediaSidebars = () => { imageSidebar.classList.remove('show'); audioSidebar.classList.remove('show'); overlay.classList.remove('show-for-media'); };
-  $('#btnToggleImageAlbum').onclick = () => { audioSidebar.classList.remove('show'); imageSidebar.classList.toggle('show'); overlay.classList.toggle('show-for-media', imageSidebar.classList.contains('show')); };
-  $('#btnToggleAudioAlbum').onclick = () => { imageSidebar.classList.remove('show'); audioSidebar.classList.toggle('show'); overlay.classList.toggle('show-for-media', audioSidebar.classList.contains('show')); };
-  $('#btnCloseImage').onclick = closeAllMediaSidebars;
-  $('#btnCloseAudio').onclick = closeAllMediaSidebars;
+  $('#btnToggleImageAlbum').onclick = () => { audioSidebar.classList.remove('show'); imageSidebar.classList.toggle('show'); if (imageSidebar.classList.contains('show')) overlay.classList.add('show-for-media'); else overlay.classList.remove('show-for-media'); };
+  $('#btnToggleAudioAlbum').onclick = () => { imageSidebar.classList.remove('show'); audioSidebar.classList.toggle('show'); if (audioSidebar.classList.contains('show')) overlay.classList.add('show-for-media'); else overlay.classList.remove('show-for-media'); };
+  $('#btnCloseImage').onclick = () => { imageSidebar.classList.remove('show'); if (!audioSidebar.classList.contains('show')) overlay.classList.remove('show-for-media'); };
+  $('#btnCloseAudio').onclick = () => { audioSidebar.classList.remove('show'); if (!imageSidebar.classList.contains('show')) overlay.classList.remove('show-for-media'); };
   $('#media-close').onclick = () => $('#media-viewer').classList.remove('show');
   $('#media-viewer').onclick = (e) => { if (e.target.id === 'media-viewer') $('#media-viewer').classList.remove('show'); };
-  globalAudioPlayer.addEventListener('timeupdate', () => { const playingItem = $('.playlist-item.playing'); if (playingItem && globalAudioPlayer.duration) playingItem.querySelector('.progress-bar').style.width = `${(globalAudioPlayer.currentTime / globalAudioPlayer.duration) * 100}%`; });
-  globalAudioPlayer.addEventListener('ended', () => { const playingItem = $('.playlist-item.playing'); if (playingItem) { playingItem.classList.remove('playing'); playingItem.querySelector('.play-icon').textContent = '▶'; } });
+  globalAudioPlayer.addEventListener('timeupdate', () => { const playingItem = $('.playlist-item.playing'); if (playingItem && globalAudioPlayer.duration) { const progress = (globalAudioPlayer.currentTime / globalAudioPlayer.duration) * 100; playingItem.querySelector('.progress-bar').style.width = `${progress}%`; } });
+  globalAudioPlayer.addEventListener('ended', () => { const playingItem = $('.playlist-item.playing'); if (playingItem) { playingItem.classList.remove('playing'); playingItem.querySelector('.play-icon').textContent = '▶'; playingItem.querySelector('.progress-bar').style.width = '0%'; } });
   globalAudioPlayer.addEventListener('pause', () => { const playingItem = $('.playlist-item.playing'); if (playingItem) { playingItem.classList.remove('playing'); playingItem.querySelector('.play-icon').textContent = '▶'; } });
-  overlay.onclick = () => { if (overlay.classList.contains('show-for-media')) closeAllMediaSidebars(); else app.classList.add('sidebar-collapsed'); };
+  overlay.onclick = () => { if (overlay.classList.contains('show-for-media')) { closeAllMediaSidebars(); } else { toggleSidebar(); } };
 
-  $('#act-add-child').addEventListener('click', () => { if (highlightedNodeId) { const node = findById(data, highlightedNodeId); if (node) onAdd(node); } });
-  $('#act-edit-node').addEventListener('click', () => { if (highlightedNodeId) { const node = findById(data, highlightedNodeId); if (node) onEdit(node); } });
-  $('#act-delete-node').addEventListener('click', () => { if (highlightedNodeId) { const node = findById(data, highlightedNodeId); if (node) onDel(node); } });
   $('#mAvatarFile').onchange = async (e) => {
-    const file = e.target.files[0]; if (!file) return;
+    const file = e.target.files[0];
+    if (!file) return;
     const imageUrl = await uploadImageToCloudinary(file);
-    if (imageUrl) $('#mAvatar').value = imageUrl;
+    if (imageUrl) {
+      $('#mAvatar').value = imageUrl;
+    }
   };
-
-  initProposalFeature();
 }
 
 function updateControlsUI() {
-    $('#toggleDecoration').checked = decorationSettings.visible;
-    $('#decorationSizeSlider').value = decorationSettings.size;
-    $('#decorationSizeLabel').textContent = decorationSettings.size;
-    $('#decorationDistanceSlider').value = decorationSettings.distance;
-    $('#decorationDistanceLabel').textContent = decorationSettings.distance;
-    $('#decorationUrlInput').value = decorationSettings.url;
+    const toggleDecoration = $('#toggleDecoration'), decorationSizeSlider = $('#decorationSizeSlider'), decorationSizeLabel = $('#decorationSizeLabel');
+    const decorationDistanceSlider = $('#decorationDistanceSlider'), decorationDistanceLabel = $('#decorationDistanceLabel');
+    const decorationUrlInput = $('#decorationUrlInput');
+    if (toggleDecoration) {
+        toggleDecoration.checked = decorationSettings.visible;
+        decorationSizeSlider.value = decorationSettings.size;
+        decorationSizeLabel.textContent = decorationSettings.size;
+        decorationDistanceSlider.value = decorationSettings.distance;
+        decorationDistanceLabel.textContent = decorationSettings.distance;
+        decorationUrlInput.value = decorationSettings.url;
+    }
 }
 function generateHierarchicalId(parent) {
     if (!parent || !parent.id) return '1'; const kids = Array.isArray(parent.children) ? parent.children : [];
-    const taken = new Set(kids.map(k => parseInt(String(k.id).split('.').pop())));
-    let suffix = 1; while (taken.has(suffix)) suffix++;
-    return parent.id + '.' + suffix;
+    const taken = new Set();
+    for (let i = 0; i < kids.length; i++) {
+        const ch = kids[i]; if (!ch || typeof ch.id !== 'string') continue;
+        if (ch.id.startsWith(parent.id + '.')) {
+            const tail = ch.id.slice(parent.id.length + 1); const n = parseInt(tail, 10);
+            if (Number.isInteger(n) && n > 0) taken.add(n);
+        }
+    }
+    let suffix = 1; while (taken.has(suffix)) suffix++; return parent.id + '.' + suffix;
 }
 window.addEventListener('keydown', (e) => {
   if (e.target.matches('input,textarea,h1')) return;
@@ -1153,86 +1360,27 @@ window.addEventListener('keydown', (e) => {
   if (e.key.toLowerCase() === 'f') { e.preventDefault(); fitToScreen(); }
   if (highlightedNodeId && isOwner) {
       const node = findById(data, highlightedNodeId);
-      if (e.key.toLowerCase() === 'a') { e.preventDefault(); onAdd(node); }
-      if (e.key.toLowerCase() === 'e') { e.preventDefault(); onEdit(node); }
-      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); onDel(node); }
+      if(!node.isProposal) { // Chỉ cho phép phím tắt trên node thường
+        if (e.key.toLowerCase() === 'a') { e.preventDefault(); onAdd(node); }
+        if (e.key.toLowerCase() === 'e') { e.preventDefault(); onEdit(node); }
+        if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); onDel(node); }
+      }
   }
   if (e.key === 'Escape') {
+      appTitle.blur();
       highlightedNodeId = null;
-      updateSelectionActions(); updateInfoPanel(null); scheduleRender();
+      updateSelectionActions();
+      updateInfoPanel(null);
+      scheduleRender();
   }
 });
 
 function applyTheme(theme) {
     document.body.dataset.theme = theme;
     localStorage.setItem(THEME_KEY, theme);
-    $('#themeSelector').value = theme;
+    const themeSelector = $('#themeSelector');
+    if (themeSelector) themeSelector.value = theme;
     scheduleRender();
-}
-
-function initProposalFeature() {
-  const btnPropose = $('#btnProposeChild');
-  const modal = $('#proposal-modal');
-  const btnCancel = $('#pCancel');
-  const btnSend = $('#pSend');
-
-  function openProposalModal(parent) {
-    $('#pParentName').textContent = parent.name || '—';
-    $('#pParentId').value = parent.id;
-    $('#pName').value=''; $('#pBirth').value=''; $('#pDeath').value=''; $('#pNote').value=''; $('#pSubmitter').value='';
-    modal.classList.add('show');
-  }
-  function closeProposalModal(){ modal.classList.remove('show'); }
-
-  btnPropose.addEventListener('click', () => {
-    if(!highlightedNodeId){ alert('Hãy nhấn vào một người trên cây gia phả trước.'); return; }
-    const parent = findById(data, highlightedNodeId);
-    if(!parent){ alert('Không tìm thấy người được chọn.'); return; }
-    openProposalModal(parent);
-  });
-
-  btnCancel.addEventListener('click', closeProposalModal);
-  modal.addEventListener('click', (e) => { if (e.target === modal) closeProposalModal(); });
-
-  btnSend.addEventListener('click', async () => {
-    const payload = {
-      parentName: $('#pParentName').textContent,
-      parentId: $('#pParentId').value,
-      childName: $('#pName').value.trim(),
-      birth: $('#pBirth').value.trim(),
-      death: $('#pDeath').value.trim(),
-      note:  $('#pNote').value.trim(),
-      submitter: $('#pSubmitter').value.trim(),
-      _subject: `Đề xuất thêm con cho: ${$('#pParentName').textContent}`,
-    };
-
-    if (!payload.childName) { alert('Vui lòng nhập Họ và tên của người con.'); return; }
-    if (!payload.submitter) { alert('Vui lòng nhập tên của bạn (Người gửi).'); return; }
-
-    btnSend.disabled = true;
-    btnSend.textContent = 'Đang gửi...';
-
-    try {
-      const res = await fetch(FORMSPREE_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (res.ok) {
-        alert('✅ Đã gửi đề xuất thành công! Cảm ơn bạn.');
-        closeProposalModal();
-      } else {
-        throw new Error('Gửi thất bại. Vui lòng thử lại.');
-      }
-    } catch (err) {
-      console.error('Lỗi khi gửi đề xuất qua Formspree:', err);
-      alert('Đã có lỗi xảy ra khi gửi đề xuất.');
-    } finally {
-      btnSend.disabled = false;
-      btnSend.textContent = 'Gửi đề xuất';
-    }
-  });
 }
 
 init();
@@ -1240,7 +1388,180 @@ init();
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js')
-      .then(reg => console.log('ServiceWorker registration successful.'))
-      .catch(err => console.log('ServiceWorker registration failed: ', err));
+      .then(registration => {
+        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+      })
+      .catch(err => {
+        console.log('ServiceWorker registration failed: ', err);
+      });
   });
+}
+
+// ===================================================================
+// ====== CÁC HÀM MỚI CHO TÍNH NĂNG ĐỀ XUẤT ======
+// ===================================================================
+
+function onProposeChild(parentNode) {
+    openModal('Đề xuất thêm con cho ' + parentNode.name, {}, async (newData) => {
+        const tempChildNode = {
+            id: 'proposal_' + Date.now(),
+            name: newData.name,
+            birth: newData.birth,
+            death: newData.death,
+            note: newData.note,
+            avatarUrl: newData.avatarUrl,
+            children: [],
+            isProposal: true,
+            parentId: parentNode.id
+        };
+
+        if (!parentNode.children) parentNode.children = [];
+        parentNode.children.push(tempChildNode);
+        updateLayout();
+        scheduleRender();
+        alert('Đã gửi đề xuất của bạn. Vui lòng chờ quản trị viên phê duyệt.');
+
+        await saveProposalToSheet(tempChildNode);
+    });
+}
+
+async function saveProposalToSheet(nodeData) {
+    if (!gapiInited) return;
+    try {
+        const proposalId = nodeData.id;
+        const values = [[
+            `'${nodeData.parentId}`,
+            nodeData.name,
+            nodeData.birth,
+            nodeData.death,
+            nodeData.note,
+            nodeData.avatarUrl,
+            proposalId,
+            'pending'
+        ]];
+
+        await gapi.client.sheets.spreadsheets.values.append({
+            spreadsheetId: PROPOSALS_SPREADSHEET_ID,
+            range: `${PROPOSALS_SHEET_NAME}!A:H`,
+            valueInputOption: 'USER_ENTERED',
+            insertDataOption: 'INSERT_ROWS',
+            resource: { values: values }
+        });
+    } catch (err) {
+        console.error("Lỗi khi lưu đề xuất:", err);
+        alert("Đã xảy ra lỗi khi gửi đề xuất của bạn.");
+    }
+}
+
+async function loadAndApplyProposals() {
+    if (!data) return;
+    try {
+        const response = await gapi.client.sheets.spreadsheets.values.get({
+            spreadsheetId: PROPOSALS_SPREADSHEET_ID,
+            range: `${PROPOSALS_SHEET_NAME}!A:H`,
+        });
+        const proposals = response.result.values;
+        if (proposals && proposals.length > 1) {
+            const headers = proposals[0].map(h => String(h).toLowerCase().trim());
+            const parentIdIdx = headers.indexOf('parentid');
+            const nameIdx = headers.indexOf('name');
+            const birthIdx = headers.indexOf('birth');
+            const deathIdx = headers.indexOf('death');
+            const noteIdx = headers.indexOf('note');
+            const avatarIdx = headers.indexOf('avatarurl');
+            const proposalIdIdx = headers.indexOf('proposalid');
+
+            for (let i = 1; i < proposals.length; i++) {
+                const row = proposals[i];
+                if (!row || row.length === 0) continue; // Bỏ qua dòng trống
+
+                const parentId = row[parentIdIdx];
+                const parentNode = findById(data, parentId);
+
+                if (parentNode) {
+                    const proposalNode = {
+                        id: row[proposalIdIdx] || 'proposal_loaded_' + i,
+                        parentId: parentId,
+                        name: row[nameIdx] || 'Chưa đặt tên',
+                        birth: row[birthIdx] || '',
+                        death: row[deathIdx] || '',
+                        note: row[noteIdx] || '',
+                        avatarUrl: row[avatarIdx] || '',
+                        children: [],
+                        isProposal: true,
+                        proposalRow: i + 1
+                    };
+                    if (!parentNode.children) parentNode.children = [];
+                    parentNode.children.push(proposalNode);
+                }
+            }
+        }
+    } catch (err) {
+        console.error("Không thể tải danh sách đề xuất:", err.result?.error?.message || err.message);
+    }
+}
+
+async function onAcceptProposal(node) {
+    pushHistory();
+    
+    delete node.isProposal;
+    node.id = generateHierarchicalId(findParent(data, node.id));
+    
+    setUnsavedChanges(true);
+    await saveAllChanges();
+
+    await deleteProposalFromSheet(node.proposalRow);
+
+    highlightedNodeId = null;
+    updateSelectionActions();
+    updateLayout();
+    scheduleRender();
+    alert('Đã chấp nhận và thêm thành viên mới vào gia phả.');
+}
+
+async function onRejectProposal(node) {
+    pushHistory();
+
+    const parent = findParent(data, node.id);
+    if (parent && parent.children) {
+        parent.children = parent.children.filter(c => c.id !== node.id);
+    }
+    
+    await deleteProposalFromSheet(node.proposalRow);
+    
+    highlightedNodeId = null;
+    updateSelectionActions();
+    updateLayout();
+    scheduleRender();
+    alert('Đã từ chối đề xuất.');
+}
+
+async function deleteProposalFromSheet(rowIndex) {
+    try {
+        const sheetResponse = await gapi.client.sheets.spreadsheets.get({
+            spreadsheetId: PROPOSALS_SPREADSHEET_ID
+        });
+        const sheet = sheetResponse.result.sheets.find(s => s.properties.title === PROPOSALS_SHEET_NAME);
+        if(!sheet) throw new Error(`Sheet with name "${PROPOSALS_SHEET_NAME}" not found.`);
+        const sheetId = sheet.properties.sheetId;
+
+        await gapi.client.sheets.spreadsheets.batchUpdate({
+            spreadsheetId: PROPOSALS_SPREADSHEET_ID,
+            resource: {
+                requests: [{
+                    deleteDimension: {
+                        range: {
+                            sheetId: sheetId,
+                            dimension: 'ROWS',
+                            startIndex: rowIndex - 1,
+                            endIndex: rowIndex
+                        }
+                    }
+                }]
+            }
+        });
+    } catch (err) {
+        console.error("Lỗi khi xóa dòng đề xuất:", err);
+        alert("Lỗi khi xóa đề xuất khỏi Google Sheet. Vui lòng thử xóa thủ công.");
+    }
 }
