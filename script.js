@@ -7,12 +7,12 @@ const CLOUDINARY_UPLOAD_PRESET = 'gia_pha_preset';
 const API_KEY = 'AIzaSyAOnCKz1lJjkWvJhWuhc9p0GMXcq3EJ-5U';
 const CLIENT_ID = '44689282931-21nb0br3on3v8dscjfibrfutg7isj9fj.apps.googleusercontent.com';
 const SPREADSHEET_ID = '1z-LGeQo8w0jzF9mg8LD_bMsXKEvtgc_lgY5F-EkTgBY';
-const PROPOSALS_SPREADSHEET_ID = '15Glu750DS5C-pZvXURHsjz8ixawvLrrW4wSwKMkq6q0'; // <-- ĐÃ THÊM
+const PROPOSALS_SPREADSHEET_ID = '15Glu750DS5C-pZvXURHsjz8ixawvLrrW4wSwKMkq6q0'; 
 const ADMIN_EMAIL = 'nklinh102@gmail.com';
 const INDEX_SHEET_NAME = '_index';
 const SETTINGS_SHEET_NAME = 'settings';
 const MEDIA_SHEET_NAME = 'Media';
-const PROPOSALS_SHEET_NAME = 'Dexuat'; // <-- ĐÃ THÊM
+const PROPOSALS_SHEET_NAME = 'Dexuat'; 
 
 // ===================================================================
 
@@ -103,7 +103,7 @@ async function saveTreeData() {
         if (data) {
             const rows = [['id', 'parentId', 'name', 'birth', 'death', 'note', 'avatarUrl']];
             (function walk(node, parentId = '') {
-                if (node.isProposal) return; // Bỏ qua các node đề xuất khi lưu
+                if (node.isProposal) return; 
                 rows.push([`'${node.id}`, parentId ? `'${parentId}` : '', node.name || '', node.birth || '', node.death || '', node.note || '', node.avatarUrl || '']);
                 (node.children || []).forEach(c => walk(c, node.id));
             })(data);
@@ -285,7 +285,7 @@ function drawNode(node) {
     const path = findPathToRoot(highlightedNodeId);
     const isHighlighted = highlightedNodeId && path.some(p => p.id === node.id);
     const isSearchFocus = node.isSearchFocus;
-    const isProposal = node.isProposal === true; // <-- ĐÃ THÊM
+    const isProposal = node.isProposal === true;
     
     ctx.save();
     if (isSearchFocus) {
@@ -295,7 +295,7 @@ function drawNode(node) {
     }
 
     ctx.shadowBlur = isHighlighted ? 20 : (isSearchFocus ? 30 : 15);
-    ctx.shadowColor = isProposal ? getCssVar('--warning') : (isHighlighted ? getCssVar('--accent') : (isSearchFocus ? getCssVar('--warning') : 'rgba(0,0,0,.5)')); // <-- ĐÃ THAY ĐỔI
+    ctx.shadowColor = isProposal ? getCssVar('--warning') : (isHighlighted ? getCssVar('--accent') : (isSearchFocus ? getCssVar('--warning') : 'rgba(0,0,0,.5)'));
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 5;
     
@@ -307,8 +307,8 @@ function drawNode(node) {
     const isSpecialDepth = node.depth === 0 || node.depth === 1;
     if (!isSpecialDepth) {
         ctx.fillStyle = getCssVar('--card');
-        ctx.strokeStyle = isProposal ? getCssVar('--warning') : (isHighlighted ? getCssVar('--accent') : (isSearchFocus ? getCssVar('--warning') : getCssVar('--border'))); // <-- ĐÃ THAY ĐỔI
-        ctx.lineWidth = isProposal ? 3 : 2; // <-- ĐÃ THAY ĐỔI
+        ctx.strokeStyle = isProposal ? getCssVar('--warning') : (isHighlighted ? getCssVar('--accent') : (isSearchFocus ? getCssVar('--warning') : getCssVar('--border')));
+        ctx.lineWidth = isProposal ? 3 : 2;
         ctx.beginPath();
         if(ctx.roundRect) ctx.roundRect(x, y, node._w, node._h, [15]); else ctx.rect(x, y, node._w, node._h);
         ctx.fill();
@@ -479,13 +479,12 @@ function resizeCanvas() {
     }
 }
 
-// <-- HÀM ĐÃ ĐƯỢC THAY ĐỔI HOÀN TOÀN -->
 function updateSelectionActions() {
     const panel = $('#selection-actions');
     const actionsGrid = panel.querySelector('.actions-grid');
     if (!panel || !actionsGrid) return;
 
-    actionsGrid.innerHTML = ''; // Xóa các nút cũ
+    actionsGrid.innerHTML = ''; 
 
     if (highlightedNodeId && isOwner) {
         const node = findById(data, highlightedNodeId);
@@ -502,7 +501,6 @@ function updateSelectionActions() {
             avatarEl.onclick = () => onEditAvatar(node);
 
             if (node.isProposal) {
-                // Hiển thị nút Chấp nhận / Từ chối
                 const acceptBtn = document.createElement('button');
                 acceptBtn.className = 'btn btn-accept';
                 acceptBtn.innerHTML = `Chấp nhận`;
@@ -516,7 +514,6 @@ function updateSelectionActions() {
                 actionsGrid.append(acceptBtn, rejectBtn);
 
             } else {
-                // Hiển thị các nút mặc định
                 const addChildBtn = document.createElement('button');
                 addChildBtn.className = 'btn';
                 addChildBtn.id = 'act-add-child';
@@ -574,7 +571,6 @@ function getGiap(node) {
     return 'N/A';
 }
 
-// <-- HÀM ĐÃ ĐƯỢC THAY ĐỔI -->
 function updateInfoPanel(nodeId) {
     const panel = $('#info-panel');
     if (!panel) return;
@@ -582,7 +578,7 @@ function updateInfoPanel(nodeId) {
     const existingBtn = $('#act-propose-child');
     if(existingBtn) existingBtn.remove();
 
-    if (!nodeId || isOwner) { // Ẩn với owner
+    if (!nodeId || isOwner) {
         panel.classList.add('hidden');
         return;
     }
@@ -629,7 +625,6 @@ function updateInfoPanel(nodeId) {
     }
     panel.classList.remove('hidden');
 
-    // Thêm nút đề xuất cho người dùng thường
     if (!isOwner && node) {
         const proposalBtn = document.createElement('button');
         proposalBtn.id = 'act-propose-child';
@@ -819,7 +814,7 @@ function download(filename, data, type) {
 function toCSV() {
   if(!data) return ''; const rows = [['id', 'parentId', 'name', 'birth', 'death', 'note']];
   (function walk(node, parentId = '') {
-      if(node.isProposal) return; // Không xuất các node đề xuất
+      if(node.isProposal) return; 
       rows.push([node.id, parentId, node.name, node.birth, node.death, node.note].map(v => { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }));
      (node.children || []).forEach(c => walk(c, node.id));
   })(data); return rows.map(row => row.join(',')).join('\n');
@@ -893,7 +888,7 @@ async function convertSVGtoJPG(svgString, quality = 0.9) {
     URL.revokeObjectURL(url);
     canvas.width = img.width;
     canvas.height = img.height;
-    ctx.fillStyle = getCssVar('--bg'); // Sử dụng màu nền của theme
+    ctx.fillStyle = getCssVar('--bg');
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0);
     return canvas.toDataURL('image/jpeg', quality);
@@ -1098,7 +1093,6 @@ async function loadInitialData() {
         alert('Không thể tải dữ liệu. Chi tiết: ' + errorMsg); data = null; scheduleRender();
     }
 }
-// <-- HÀM ĐÃ ĐƯỢC THAY ĐỔI -->
 async function loadTreeData(sheetName) {
     if (!sheetName) return; currentSheetName = sheetName; document.body.style.cursor = 'wait'; data = null; scheduleRender();
     try {
@@ -1106,17 +1100,18 @@ async function loadTreeData(sheetName) {
         const treeRows = response.result.values; if (treeRows && treeRows.length > 0) { const csvText = treeRows.map(row => row.join(',')).join('\n'); data = fromCSV(csvText); }
     } catch (e) { console.error(`Lỗi khi tải từ sheet "${sheetName}":`, e); alert(`Không thể tải phả đồ "${sheetName}".`); }
     finally {
-        try { updateLayout(); } catch (err) {
+        if (isOwner) {
+            await loadAndApplyProposals();
+        }
+        try { 
+            updateLayout(); 
+        } catch (err) {
             console.error("Lỗi layout:", err); if (err.message.toLowerCase().includes("stack")) { alert("Lỗi Hiển Thị: Dữ liệu bị lặp vòng tròn. Vui lòng kiểm tra file Google Sheet."); }
             else { alert("Lỗi khi hiển thị cây: " + err.message); } data = null;
         }
         
-        if (isOwner) {
-            await loadAndApplyProposals();
-            updateLayout(); 
-        }
-
-        fitToScreen(); savedTitle = appTitle.textContent; localStorage.setItem(LS_KEY_PREFIX + 'lastSelectedSheet', sheetName);
+        fitToScreen(); 
+        savedTitle = appTitle.textContent; localStorage.setItem(LS_KEY_PREFIX + 'lastSelectedSheet', sheetName);
         document.body.style.cursor = 'default'; history = []; future = []; setUnsavedChanges(false);
         if (isOwner) { $('#btnUndo').disabled = true; $('#btnRedo').disabled = true; }
     }
@@ -1360,7 +1355,7 @@ window.addEventListener('keydown', (e) => {
   if (e.key.toLowerCase() === 'f') { e.preventDefault(); fitToScreen(); }
   if (highlightedNodeId && isOwner) {
       const node = findById(data, highlightedNodeId);
-      if(!node.isProposal) { // Chỉ cho phép phím tắt trên node thường
+      if(node && !node.isProposal) { 
         if (e.key.toLowerCase() === 'a') { e.preventDefault(); onAdd(node); }
         if (e.key.toLowerCase() === 'e') { e.preventDefault(); onEdit(node); }
         if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); onDel(node); }
@@ -1417,16 +1412,25 @@ function onProposeChild(parentNode) {
 
         if (!parentNode.children) parentNode.children = [];
         parentNode.children.push(tempChildNode);
-        updateLayout();
-        scheduleRender();
-        alert('Đã gửi đề xuất của bạn. Vui lòng chờ quản trị viên phê duyệt.');
+        
+        // Bọc trong setTimeout để đảm bảo modal đã đóng hoàn toàn
+        // trước khi thực hiện các tính toán nặng về layout.
+        setTimeout(() => {
+            console.log("Adding proposal node to view:", tempChildNode);
+            updateLayout();
+            scheduleRender();
+        }, 0);
 
+        alert('Đã gửi đề xuất của bạn. Vui lòng chờ quản trị viên phê duyệt.');
         await saveProposalToSheet(tempChildNode);
     });
 }
 
 async function saveProposalToSheet(nodeData) {
-    if (!gapiInited) return;
+    if (!gapiInited) {
+        console.error("GAPI is not ready. Cannot save proposal.");
+        return;
+    }
     try {
         const proposalId = nodeData.id;
         const values = [[
@@ -1447,14 +1451,16 @@ async function saveProposalToSheet(nodeData) {
             insertDataOption: 'INSERT_ROWS',
             resource: { values: values }
         });
+        console.log("Proposal saved to sheet successfully.");
     } catch (err) {
-        console.error("Lỗi khi lưu đề xuất:", err);
-        alert("Đã xảy ra lỗi khi gửi đề xuất của bạn.");
+        console.error("Lỗi nghiêm trọng khi lưu đề xuất vào Sheet:", err.result?.error?.message || err.message);
+        alert("Đã xảy ra lỗi khi gửi đề xuất của bạn. Vui lòng kiểm tra Console (F12) để biết chi tiết.");
     }
 }
 
 async function loadAndApplyProposals() {
     if (!data) return;
+    console.log("Admin mode: Loading proposals from sheet...");
     try {
         const response = await gapi.client.sheets.spreadsheets.values.get({
             spreadsheetId: PROPOSALS_SPREADSHEET_ID,
@@ -1462,6 +1468,7 @@ async function loadAndApplyProposals() {
         });
         const proposals = response.result.values;
         if (proposals && proposals.length > 1) {
+            console.log(`Found ${proposals.length - 1} proposal(s).`);
             const headers = proposals[0].map(h => String(h).toLowerCase().trim());
             const parentIdIdx = headers.indexOf('parentid');
             const nameIdx = headers.indexOf('name');
@@ -1473,12 +1480,15 @@ async function loadAndApplyProposals() {
 
             for (let i = 1; i < proposals.length; i++) {
                 const row = proposals[i];
-                if (!row || row.length === 0) continue; // Bỏ qua dòng trống
+                if (!row || row.length === 0) continue;
 
                 const parentId = row[parentIdIdx];
                 const parentNode = findById(data, parentId);
+                
+                console.log(`Processing proposal row ${i+1}: parentId '${parentId}'`);
 
                 if (parentNode) {
+                    console.log(`Parent node found for ${parentId}. Attaching proposal node.`);
                     const proposalNode = {
                         id: row[proposalIdIdx] || 'proposal_loaded_' + i,
                         parentId: parentId,
@@ -1493,8 +1503,12 @@ async function loadAndApplyProposals() {
                     };
                     if (!parentNode.children) parentNode.children = [];
                     parentNode.children.push(proposalNode);
+                } else {
+                    console.warn(`Parent node with id '${parentId}' NOT FOUND for proposal in row ${i+1}.`);
                 }
             }
+        } else {
+            console.log("No proposals found in the sheet.");
         }
     } catch (err) {
         console.error("Không thể tải danh sách đề xuất:", err.result?.error?.message || err.message);
@@ -1560,8 +1574,9 @@ async function deleteProposalFromSheet(rowIndex) {
                 }]
             }
         });
+        console.log(`Successfully deleted row ${rowIndex} from proposal sheet.`);
     } catch (err) {
-        console.error("Lỗi khi xóa dòng đề xuất:", err);
+        console.error("Lỗi khi xóa dòng đề xuất:", err.result?.error?.message || err.message);
         alert("Lỗi khi xóa đề xuất khỏi Google Sheet. Vui lòng thử xóa thủ công.");
     }
 }
