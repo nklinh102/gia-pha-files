@@ -1476,3 +1476,74 @@ if ('serviceWorker' in navigator) {
     btn.style.display = (n && n.status === 'PENDING') ? 'block' : 'none';
   };
 })();
+
+
+// === Overlay pending badges on nodes for Admin (uses #node-icons-container) ===
+(function(){
+  const container = document.getElementById('node-icons-container');
+  if(!container) return;
+
+  function walk(n, acc){
+    if(!n) return;
+    acc.push(n);
+    (n.children||[]).forEach(c=>walk(c, acc));
+  }
+
+  function paintBadges(){
+    if(!container) return;
+    container.innerHTML = '';
+    if(!isOwner || !data) return;
+    const nodes = []; walk(data, nodes);
+
+    nodes.forEach(n=>{
+      if(n.status === 'PENDING' && typeof n._x === 'number' && typeof n._y === 'number'){
+        const el = document.createElement('div');
+        el.className = 'node-icon badge-pending';
+        el.textContent = '!';
+        // convert world coords to screen coords
+        const px = panX + (n._x + (n._w/2) - 12) * scale;
+        const py = panY + (n._y - (n._h/2) + 4) * scale;
+        el.style.left = px + 'px';
+        el.style.top = py + 'px';
+        el.style.position = 'absolute';
+        el.style.pointerEvents = 'auto'; // override container's pointer-events
+        el.title = 'Đề xuất đang chờ duyệt';
+
+        el.addEventListener('click', (e)=>{
+          e.stopPropagation();
+          highlightedNodeId = n.id;
+          updateSelectionActions && updateSelectionActions();
+          updateInfoPanel && updateInfoPanel(highlightedNodeId);
+          // gợi ý nơi duyệt
+          const btn = document.getElementById('act-approve-proposal');
+          if(btn && btn.style.display !== 'none'){
+            btn.animate([{transform:'scale(1)'},{transform:'scale(1.08)'},{transform:'scale(1)'}], {duration:400});
+          }
+        });
+
+        container.appendChild(el);
+      }
+    });
+  }
+
+  // hook sau mỗi lần render/scheduleRender
+  if (typeof window.render === 'function') {
+    const _render = window.render;
+    window.render = function(){
+      _render.apply(this, arguments);
+      try { paintBadges(); } catch(e){ console.warn(e); }
+    };
+  } else if (typeof window.scheduleRender === 'function') {
+    const _scheduleRender = window.scheduleRender;
+    window.scheduleRender = function(){
+      _scheduleRender.apply(this, arguments);
+      requestAnimationFrame(()=>{ try { paintBadges(); } catch(e){} });
+    };
+  } else {
+    // fallback: vẽ sau khi DOM ready
+    document.addEventListener('DOMContentLoaded', ()=> setTimeout(paintBadges, 200));
+  }
+
+  // expose for manual refresh if cần
+  window.__paintPendingBadges = paintBadges;
+})();
