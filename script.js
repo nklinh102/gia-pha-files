@@ -1464,9 +1464,6 @@ async function saveProposalToSheet(nodeData) {
     }
 }
 
-
-// THAY THẾ TOÀN BỘ HÀM loadAndApplyProposals CŨ BẰNG HÀM NÀY
-
 async function loadAndApplyProposals() {
     if (!data || !isOwner) return; // Chỉ Admin mới tải đề xuất
     console.log("Admin mode: Loading proposals from sheet...");
@@ -1480,25 +1477,33 @@ async function loadAndApplyProposals() {
         if (proposals && proposals.length > 1) {
             console.log(`Found ${proposals.length - 1} proposal(s).`);
             const headers = proposals[0].map(h => String(h).toLowerCase().trim());
+            
+            // --- PHẦN CẬP NHẬT BẮT ĐẦU TỪ ĐÂY ---
             const parentIdIdx = headers.indexOf('parentid');
             const nameIdx = headers.indexOf('name');
+            const proposalIdIdx = headers.indexOf('proposalid');
+
+            // Kiểm tra xem các cột quan trọng có tồn tại không
+            if (parentIdIdx === -1 || nameIdx === -1 || proposalIdIdx === -1) {
+                console.error("LỖI CẤU HÌNH SHEET 'Dexuat': Không tìm thấy một trong các cột bắt buộc: 'parentId', 'name', 'proposalId'. Vui lòng kiểm tra lại tên cột trong Google Sheet.");
+                alert("Lỗi cấu hình sheet đề xuất. Vui lòng kiểm tra Console (F12) để biết chi tiết.");
+                return; // Dừng hàm tại đây
+            }
+            // --- KẾT THÚC PHẦN CẬP NHẬT ---
+
             const birthIdx = headers.indexOf('birth');
             const deathIdx = headers.indexOf('death');
             const noteIdx = headers.indexOf('note');
             const avatarIdx = headers.indexOf('avatarurl');
-            const proposalIdIdx = headers.indexOf('proposalid');
 
             for (let i = 1; i < proposals.length; i++) {
                 const row = proposals[i];
                 if (!row || row.length === 0) continue;
 
-                // --- PHẦN SỬA LỖI BẮT ĐẦU TỪ ĐÂY ---
                 let parentId = row[parentIdIdx];
                 if (parentId && typeof parentId === 'string' && parentId.startsWith("'")) {
-                    // Loại bỏ dấu nháy đơn ở đầu nếu có
                     parentId = parentId.substring(1);
                 }
-                // --- KẾT THÚC PHẦN SỬA LỖI ---
                 
                 const parentNode = findById(data, parentId);
                 
@@ -1531,7 +1536,6 @@ async function loadAndApplyProposals() {
         console.error("Không thể tải danh sách đề xuất:", err.result?.error?.message || err.message);
     }
 }
-
 async function onAcceptProposal(node) {
     pushHistory();
     
