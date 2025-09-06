@@ -574,7 +574,8 @@ function getGiap(node) {
     return 'N/A';
 }
 
-// === HÀM updateInfoPanel ĐÃ ĐƯỢC CẬP NHẬT ĐỂ PHÙ HỢP GIAO DIỆN MỚI ===
+// THAY THẾ TOÀN BỘ HÀM updateInfoPanel CŨ BẰNG HÀM NÀY
+
 function updateInfoPanel(nodeId) {
     const panel = $('#info-panel');
     if (!panel) return;
@@ -596,11 +597,16 @@ function updateInfoPanel(nodeId) {
     $('#info-name').textContent = node.name || 'N/A';
 
     const avatarContainer = $('#info-avatar');
+    // === PHẦN CHỈNH SỬA BẮT ĐẦU TỪ ĐÂY ===
     if (node.avatarUrl) {
+        // Nếu có ảnh, hiển thị ô tròn và đặt ảnh nền
+        avatarContainer.style.display = 'block'; 
         avatarContainer.style.backgroundImage = `url(${node.avatarUrl})`;
     } else {
-        avatarContainer.style.backgroundImage = `url('https://cdn.jsdelivr.net/gh/nklinh102/gia-pha-files@main/images/default-avatar.png')`; 
+        // Nếu không có ảnh, ẩn hoàn toàn ô tròn đi
+        avatarContainer.style.display = 'none'; 
     }
+    // === KẾT THÚC PHẦN CHỈNH SỬA ===
 
     $('#info-generation').textContent = `Giáp ${getGiap(node)} / Đời ${node.depth + 1}`;
     $('#info-sons').textContent = `${(node.children || []).length} con trai`;
