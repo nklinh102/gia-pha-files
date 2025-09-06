@@ -7,11 +7,11 @@ const CLOUDINARY_UPLOAD_PRESET = 'gia_pha_preset';
 const API_KEY = 'AIzaSyAOnCKz1lJjkWvJhWuhc9p0GMXcq3EJ-5U';
 const CLIENT_ID = '44689282931-21nb0br3on3v8dscjfibrfutg7isj9fj.apps.googleusercontent.com';
 const SPREADSHEET_ID = '1z-LGeQo8w0jzF9mg8LD_bMsXKEvtgc_lgY5F-EkTgBY';
-const PROPOSAL_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbz7BH1Tn7v0suaPDcT3FfIEtKeH3yaYSZyxOQPctta_/dev';
 const ADMIN_EMAIL = 'nklinh102@gmail.com';
 const INDEX_SHEET_NAME = '_index';
 const SETTINGS_SHEET_NAME = 'settings';
 const MEDIA_SHEET_NAME = 'Media';
+const PROPOSAL_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbxngHH01as4d2rqMVUztd_AK1k6kgfZOhtFxiaphdFlxY4AcblBgnPcx3l-VZAqxOWU-A/exec';
 
 // ===================================================================
 
@@ -302,7 +302,17 @@ function drawNode(node) {
     }
 
     const isSpecialDepth = node.depth === 0 || node.depth === 1;
-    if (!isSpecialDepth) {
+    const isPending = node.status === 'PENDING';
+    if (isPending) {
+        // Highlight pending nodes with orange card regardless of depth
+        ctx.fillStyle = '#ffb347';
+        ctx.strokeStyle = '#e67e22';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        if(ctx.roundRect) ctx.roundRect(x, y, node._w, node._h, [15]); else ctx.rect(x, y, node._w, node._h);
+        ctx.fill(); ctx.stroke();
+    }
+    \1if (!isSpecialDepth) {
         ctx.fillStyle = getCssVar('--card');
         ctx.strokeStyle = isHighlighted ? getCssVar('--accent') : (isSearchFocus ? getCssVar('--warning') : getCssVar('--border'));
         ctx.lineWidth = 2;
@@ -706,96 +716,6 @@ function openModal(title, init, onSave) {
   btnSave.addEventListener('click', saveHandler); btnCancel.addEventListener('click', close); modal.addEventListener('click', outside); document.addEventListener('keydown', esc);
   setTimeout(() => mName.focus(), 50);
 }
-// ====== ĐỀ XUẤT THÊM CON ======
-function openProposalModal(parent) {
-  const modal = $('#proposal-modal');
-  if (!modal) return;
-
-  $('#pParentName').textContent = parent.name || parent.id;
-  $('#pParentId').value = parent.id;
-  $('#pName').value = '';
-  $('#pBirth').value = '';
-  $('#pDeath').value = '';
-  $('#pNote').value = '';
-  $('#pSubmitter').value = '';
-
-  modal.classList.add('show');
-
-  const btnCancel = $('#pCancel');
-  const btnSend = $('#pSend');
-
-  const cleanup = () => {
-    modal.classList.remove('show');
-    btnCancel.removeEventListener('click', onCancel);
-    btnSend.removeEventListener('click', onSend);
-    modal.removeEventListener('click', onOutside);
-    document.removeEventListener('keydown', onEsc);
-  };
-  const onCancel = () => cleanup();
-  const onOutside = (e) => { if (e.target === modal) cleanup(); };
-  const onEsc = (e) => { if (e.key === 'Escape') cleanup(); };
-
-  const onSend = async () => {
-  const payload = {
-    action: 'submit',
-    sheetName: currentSheetName,
-    mainSpreadsheetId: SPREADSHEET_ID,
-    parentId: $('#pParentId').value,
-    parentName: $('#pParentName').textContent,
-    child: {
-      name: $('#pName').value.trim(),
-      birth: $('#pBirth').value.trim(),
-      death: $('#pDeath').value.trim(),
-      note: $('#pNote').value.trim()
-    },
-    submitter: $('#pSubmitter').value.trim(),
-    pageUrl: location.href,
-    ua: navigator.userAgent,
-    ts: new Date().toISOString()
-  };
-
-  if (!payload.child.name) {
-    alert('Vui lòng nhập Họ và tên.');
-    return;
-  }
-
-  btnSend.disabled = true;
-  btnSend.textContent = 'Đang gửi...';
-
-  // Gửi như “simple request” để tránh preflight CORS
-  const form = new URLSearchParams();
-  form.append('payload', JSON.stringify(payload));
-
-  const controller = new AbortController();
-  const to = setTimeout(() => controller.abort(), 12000);
-
-  try {
-    await fetch(PROPOSAL_WEBAPP_URL, {
-      method: 'POST',
-      body: form,         // => Content-Type: application/x-www-form-urlencoded
-      mode: 'no-cors',    // tránh kiểm tra CORS/Preflight
-      signal: controller.signal
-    });
-
-    // Với no-cors, không đọc được phản hồi -> coi như gửi thành công nếu không throw
-    alert('✅ Đã gửi đề xuất. Cảm ơn bạn!');
-    cleanup();
-  } catch (err) {
-    console.error(err);
-    alert('❌ Gửi thất bại. Vui lòng thử lại sau.');
-  } finally {
-    clearTimeout(to);
-    btnSend.disabled = false;
-    btnSend.textContent = 'Gửi đề xuất';
-  }
-};
-
-  btnCancel.addEventListener('click', onCancel);
-  btnSend.addEventListener('click', onSend);
-  modal.addEventListener('click', onOutside);
-  document.addEventListener('keydown', onEsc);
-}
-
 function openConfirm(message, onYes) {
   const c = $('#confirm'), msg = $('#cMsg'), yes = $('#cYes'), no = $('#cNo');
   msg.textContent = message; c.classList.add('show');
@@ -1268,17 +1188,6 @@ function init() {
   document.addEventListener('click', (e) => {
     if (!searchContainer.contains(e.target)) {
       searchContainer.classList.remove('search-expanded');
-
-  // Nút "Đề xuất thêm con" (panel info chỉ hiện khi không phải owner)
-  const btnPropose = $('#btnProposeChild');
-  if (btnPropose) {
-    btnPropose.addEventListener('click', () => {
-      if (!highlightedNodeId) return;
-      const parent = findById(data, highlightedNodeId);
-      if (parent) openProposalModal(parent);
-    });
-  }
-
     }
   });
 
@@ -1439,3 +1348,131 @@ if ('serviceWorker' in navigator) {
       });
   });
 }
+
+
+
+// ===== Proposal (submit/approve) =====
+(function(){
+  const $ = (s)=>document.querySelector(s);
+  function openProposalModal(parent){
+    $('#pParentName').textContent = parent.name || '—';
+    $('#pParentId').value = parent.id;
+    $('#pName').value=''; $('#pBirth').value=''; $('#pDeath').value=''; $('#pNote').value=''; $('#pSubmitter').value='';
+    $('#proposal-modal').classList.add('show');
+  }
+  function closeProposalModal(){ $('#proposal-modal').classList.remove('show'); }
+
+  // Hook button in info panel
+  const btnPropose = document.getElementById('btnProposeChild');
+  if(btnPropose){
+    btnPropose.addEventListener('click', ()=>{
+      if(!highlightedNodeId){ alert('Hãy nhấn vào thẻ tên trên cây trước.'); return; }
+      const parent = findById(data, highlightedNodeId);
+      if(!parent){ alert('Không tìm thấy người được chọn.'); return; }
+      openProposalModal(parent);
+    });
+  }
+  const cancelBtn = document.getElementById('pCancel');
+  if(cancelBtn){ cancelBtn.addEventListener('click', closeProposalModal); }
+
+  const sendBtn = document.getElementById('pSend');
+  if(sendBtn){
+    sendBtn.addEventListener('click', async ()=>{
+      const payload = {
+        action: 'submit',
+        sheetName: currentSheetName || 'Sheet1',
+        parentId: document.getElementById('pParentId').value,
+        parentName: document.getElementById('pParentName').textContent,
+        child: {
+          name: document.getElementById('pName').value.trim(),
+          birth: document.getElementById('pBirth').value.trim(),
+          death: document.getElementById('pDeath').value.trim(),
+          note:  document.getElementById('pNote').value.trim()
+        },
+        submitter: document.getElementById('pSubmitter').value.trim(),
+        pageUrl: location.href,
+        ua: navigator.userAgent,
+        ts: new Date().toISOString()
+      };
+      if(!payload.child.name){ alert('Vui lòng nhập Họ và tên.'); return; }
+      let proposalId = 'pending-'+Date.now();
+      try{
+        const res = await fetch(PROPOSAL_WEBAPP_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        try{ const j = await res.json(); if(j && j.ok && j.proposalId) proposalId = j.proposalId; }catch{}
+      }catch(err){
+        try{
+          const form = new URLSearchParams();
+          form.append('payload', JSON.stringify(payload));
+          await fetch(PROPOSAL_WEBAPP_URL, { method:'POST', body:form, mode:'no-cors' });
+        }catch(e){ console.warn('Gửi đề xuất (fallback) lỗi:', e); }
+      }
+
+      // Show pending child on tree (local overlay)
+      const parent = findById(data, payload.parentId);
+      if(parent){
+        if(!Array.isArray(parent.children)) parent.children = [];
+        const tempNode = {
+          id: payload.parentId + '.temp.' + Date.now(),
+          parentId: payload.parentId,
+          name: payload.child.name,
+          birth: payload.child.birth,
+          death: payload.child.death,
+          note: payload.child.note,
+          status: 'PENDING',
+          proposalId,
+          children: []
+        };
+        parent.children.push(tempNode);
+        try{ updateLayout(); }catch(e){}
+        scheduleRender();
+      }
+      alert('✅ Đã gửi đề xuất! Node mới sẽ hiển thị màu cam cho tới khi admin chấp nhận.');
+      closeProposalModal();
+    });
+  }
+
+  // Owner approve button in selection actions
+  const approveBtn = document.getElementById('act-approve-proposal');
+  if(approveBtn){
+    approveBtn.addEventListener('click', async ()=>{
+      if(!highlightedNodeId){ alert('Chọn một thẻ đang chờ duyệt.'); return; }
+      const node = findById(data, highlightedNodeId);
+      if(!node || node.status !== 'PENDING' || !node.proposalId){
+        alert('Thẻ hiện tại không phải đề xuất hoặc thiếu mã đề xuất.');
+        return;
+      }
+      try{
+        const res = await fetch(PROPOSAL_WEBAPP_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action:'approve', proposalId: node.proposalId })
+        });
+        const j = await res.json();
+        if(!j.ok){ alert('Lỗi duyệt: ' + (j.error||'unknown')); return; }
+        node.status = 'APPROVED';
+        if(j.newId) node.id = j.newId;
+        try{ updateLayout(); }catch{}
+        scheduleRender();
+        alert('✔ Đã chấp nhận và đồng bộ vào sheet chính.');
+      }catch(err){
+        console.error(err);
+        alert('Lỗi gọi approve: ' + err.message);
+      }
+    });
+  }
+
+  // Extend updateSelectionActions to toggle approve button visibility
+  const _updateSelectionActions = updateSelectionActions;
+  window.updateSelectionActions = function(){
+    _updateSelectionActions();
+    const btn = document.getElementById('act-approve-proposal');
+    if(!btn) return;
+    if(!highlightedNodeId || !isOwner){ btn.style.display='none'; return; }
+    const n = findById(data, highlightedNodeId);
+    btn.style.display = (n && n.status === 'PENDING') ? 'block' : 'none';
+  };
+})();
