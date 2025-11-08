@@ -6,7 +6,7 @@
     "decoration_visible": true,
     "decoration_size": 150,
     "decoration_distance": 85,
-    "decoration_url": "https://cdn.jsdelivr.net/gh/nklinh102/gia-pha-files@main/images/Cuonthu.png"
+    "decoration_url": "https://cdn.jsdelivr.net/gh/nklinh102/gia-pha-files@main/media/Cuonthu.png"
   },
   "media": {
     "images": [
@@ -28,4 +28,5 @@
       "fileName": "tree-ho-nguyen.json"
     }
   ]
+
 }
