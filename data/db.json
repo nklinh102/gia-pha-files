@@ -1,6 +1,6 @@
 {
   "settings": {
-    "bg_url": "https://cdn.jsdelivr.net/gh/nklinh102/gia-pha-files@main/images/anhnen.jpg",
+    "bg_url": "https://cdn.jsdelivr.net/gh/nklinh102/gia-pha-files@main/media/anhnen.jpg",
     "gap_x": 40,
     "tree_title": "Gia Phả",
     "decoration_visible": true,
@@ -30,3 +30,4 @@
   ]
 
 }
+
