@@ -1,32 +1,16 @@
 // ===================================================================
 // ====== THÔNG TIN CẤU HÌNH ======
 // ===================================================================
-const CLOUDINARY_CLOUD_NAME = 'docowfdvd';
-const CLOUDINARY_UPLOAD_PRESET = 'gia_pha_preset';
-
-const API_KEY = 'AIzaSyAOnCKz1lJjkWvJhWuhc9p0GMXcq3EJ-5U';
-const CLIENT_ID = '44689282931-21nb0br3on3v8dscjfibrfutg7isj9fj.apps.googleusercontent.com';
-const SPREADSHEET_ID = '1z-LGeQo8w0jzF9mg8LD_bMsXKEvtgc_lgY5F-EkTgBY';
-const PROPOSALS_SPREADSHEET_ID = '15Glu750DS5C-pZvXURHsjz8ixawvLrrW4wSwKMkq6q0'; 
-
-// ❗️❗️❗️ DÁN WEB APP URL CỦA BẠN VÀO ĐÂY ❗️❗️❗️
-const PROPOSAL_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxJ9F6LjUvxs6ER_2ChqgrZMczMmeqWReAoHe63URkdxj2bunx3bs0VKWWU2L9m5CaY4Q/exec'; 
-
-const ADMIN_EMAIL = 'nklinh102@gmail.com';
-const INDEX_SHEET_NAME = '_index';
-const SETTINGS_SHEET_NAME = 'settings';
-const MEDIA_SHEET_NAME = 'Media';
-const PROPOSALS_SHEET_NAME = 'Dexuat'; 
+const DB_FILE_PATH = 'data/db.json'; 
+const PROPOSALS_FILE_PATH = 'data/proposals.json';
+const TREE_DATA_PATH = 'data/'; // Sẽ nối thêm tên file, ví dụ 'tree-ho-nguyen.json'
 
 // ===================================================================
-
 // ====== Trạng thái & Hằng số ======
-const LS_KEY_PREFIX = 'familyTree.v13.';
-const THEME_KEY = 'familyTreeTheme.v13';
-const TITLE_KEY = 'familyTreeTitle.v13';
-const MINIMAP_KEY = 'familyTreeMinimap.v13';
-const ACCENT_KEY = 'familyTreeAccent.v13';
-const GAPX_KEY = 'familyTreeGapX.v13';
+// ===================================================================
+const LS_KEY_PREFIX = 'familyTree.v15.'; // Tăng phiên bản
+const THEME_KEY = 'familyTreeTheme.v15';
+const GAPX_KEY = 'familyTreeGapX.v15';
 const GEN1_W = 400, GEN1_H = 90;
 const GEN2_W = 330, GEN2_H = 85;
 const GEN345_W = 200, GEN345_H = 72;
@@ -34,7 +18,6 @@ const GEN6PLUS_W = 60, GEN6PLUS_H = 180;
 const VERTICAL_THRESHOLD = 5;
 let gapX = 40;
 const DEFAULT_GAP_Y = 50;
-
 const MIN_QUERY = 2;
 const SEARCH_DEBOUNCE = 450;
 
@@ -46,19 +29,20 @@ let decorationSettings = {
     url: 'https://cdn.jsdelivr.net/gh/nklinh102/gia-pha-files@main/images/Cuonthu.png'
 };
 
-let currentSheetName = '';
+// ====== Trạng thái ======
+let currentTreeFileName = ''; 
+let globalSettings = {}; 
 let data = null, scale = 1, panX = 80, panY = 60;
 let treeSize = { w: 0, h: 0 };
 let yPositions = {};
 let history = [], future = [];
-let isOwner = false;
-let gapiInited = false;
-let oauthToken = null;
+let isOwner = false; // Trạng thái Admin, quản lý bởi Netlify Identity
 let hasUnsavedChanges = false;
 let highlightedNodeId = null;
 let hoveredNodeId = null;
 let savedTitle = 'Sơ Đồ Gia Phả';
 let allImages = [], allAudios = [];
+let allProposals = []; // Lưu trữ tất cả đề xuất từ proposals.json
 let currentImageIndex = 0;
 let treeIndex = [];
 let isRenderScheduled = false;
@@ -66,6 +50,7 @@ let domNodeIcons = new Map();
 let nodesFlat = [];
 let panAnimId = null;
 
+// ====== DOM & Tiện ích ======
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 const app = $('.app');
@@ -81,6 +66,7 @@ const treeSelector = $('#tree-selector');
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const norm = s => (s||'').normalize('NFD').replace(/\p{M}/gu,'').toLowerCase();
+
 function setUnsavedChanges(isDirty) {
     hasUnsavedChanges = isDirty;
     const saveBtn = $('#btnSaveChanges');
@@ -90,37 +76,196 @@ function setUnsavedChanges(isDirty) {
     } else { document.title = savedTitle; }
 }
 
+// ===================================================================
+// ====== LƯU TRỮ DỮ LIỆU (NETLIFY FUNCTIONS) ======
+// ===================================================================
+
+/**
+ * Hàm 'backend' chung để gọi Netlify Function (cho Admin)
+ * @param {string} functionName - Tên của function (ví dụ: 'save-data')
+ * @param {object} payload - Dữ liệu gửi lên
+ */
+async function callAdminFunction(functionName, payload) {
+    if (!isOwner) {
+        alert("Bạn không có quyền thực hiện hành động này.");
+        return { success: false, error: "Không có quyền" };
+    }
+    const user = netlifyIdentity.currentUser();
+    if (!user) {
+        alert("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+        return { success: false, error: "Hết hạn đăng nhập" };
+    }
+
+    try {
+        const token = await user.jwt();
+        const response = await fetch(`/.netlify/functions/${functionName}`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result.message || 'Lỗi không xác định từ server');
+        }
+        return { success: true, data: result };
+
+    } catch (err) {
+        console.error(`Lỗi khi gọi ${functionName}:`, err);
+        alert(`Đã xảy ra lỗi: ${err.message}`);
+        return { success: false, error: err.message };
+    }
+}
+
 async function saveAllChanges() {
-    if (!isOwner) return;
     const saveBtn = $('#btnSaveChanges');
     saveBtn.textContent = 'Đang lưu...';
     saveBtn.disabled = true;
-    await Promise.all([ saveTreeData(), saveSettingsToSheet() ]);
-    setUnsavedChanges(false);
+
+    // 1. Cập nhật globalSettings từ UI
+    globalSettings.settings.bg_url = $('#bgUrlInput').value.trim();
+    globalSettings.settings.gap_x = parseInt($('#gapXSlider').value, 10);
+    globalSettings.settings.tree_title = appTitle.textContent.trim();
+    globalSettings.settings.decoration_visible = decorationSettings.visible;
+    globalSettings.settings.decoration_size = decorationSettings.size;
+    globalSettings.settings.decoration_distance = decorationSettings.distance;
+    globalSettings.settings.decoration_url = decorationSettings.url;
+
+    // 2. Tạo các payload
+    const treePayload = { filePath: `${TREE_DATA_PATH}${currentTreeFileName}`, data: data };
+    const settingsPayload = { filePath: DB_FILE_PATH, data: globalSettings };
+    const proposalsPayload = { filePath: PROPOSALS_FILE_PATH, data: allProposals };
+
+    // 3. Gọi lưu song song
+    const results = await Promise.all([
+        callAdminFunction('save-data', treePayload),
+        callAdminFunction('save-data', settingsPayload),
+        callAdminFunction('save-data', proposalsPayload)
+    ]);
+
+    if (results.every(r => r.success)) {
+        setUnsavedChanges(false);
+        alert('Đã lưu tất cả thay đổi thành công!');
+    } else {
+        alert('Một số thay đổi có thể chưa được lưu. Vui lòng kiểm tra lại.');
+    }
+    
     saveBtn.textContent = 'Lưu Thay Đổi';
-    alert('Đã lưu tất cả thay đổi thành công!');
 }
-async function saveTreeData() {
-    if (!isOwner || !currentSheetName) return;
+
+// ===================================================================
+// ====== TẢI DỮ LIỆU (TỪ GITHUB JSON) ======
+// ===================================================================
+
+async function fetchJSON(url) {
+    const response = await fetch(`${url}?v=${Date.now()}`); // Cache-busting
+    if (!response.ok) {
+        throw new Error(`Không thể tải ${url}: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+async function loadInitialData() {
+    document.body.style.cursor = 'wait';
     try {
-        await gapi.client.sheets.spreadsheets.values.clear({ spreadsheetId: SPREADSHEET_ID, range: currentSheetName });
-        if (data) {
-            const rows = [['id', 'parentId', 'name', 'birth', 'death', 'note', 'avatarUrl']];
-            (function walk(node, parentId = '') {
-                if (node.isProposal) return; 
-                rows.push([`'${node.id}`, parentId ? `'${parentId}` : '', node.name || '', node.birth || '', node.death || '', node.note || '', node.avatarUrl || '']);
-                (node.children || []).forEach(c => walk(c, node.id));
-            })(data);
-            await gapi.client.sheets.spreadsheets.values.update({
-                spreadsheetId: SPREADSHEET_ID, range: `${currentSheetName}!A1`, valueInputOption: 'USER-ENTERED',
-                resource: { values: rows }
-            });
+        globalSettings = await fetchJSON(DB_FILE_PATH);
+        
+        // 1. Áp dụng Cài đặt (Settings)
+        const settings = globalSettings.settings || {};
+        if (settings.bg_url) { canvasContainer.style.backgroundImage = `url(${settings.bg_url})`; $('#bgUrlInput').value = settings.bg_url; }
+        gapX = parseInt(settings.gap_x, 10) || 40; $('#gapXSlider').value = gapX; $('#gapValueLabel').textContent = gapX;
+        const centralTitle = settings.tree_title || 'Sơ Đồ Gia Phả';
+        savedTitle = centralTitle; appTitle.textContent = centralTitle; document.title = centralTitle;
+        
+        decorationSettings.visible = String(settings.decoration_visible).toLowerCase() !== 'false';
+        decorationSettings.size = parseInt(settings.decoration_size, 10) || 150;
+        decorationSettings.distance = parseInt(settings.decoration_distance, 10) || 85; 
+        decorationSettings.url = settings.decoration_url || 'https://cdn.jsdelivr.net/gh/nklinh102/gia-pha-files@main/images/Cuonthu.png';
+        treeDecoration.src = decorationSettings.url; 
+        updateControlsUI();
+
+        // 2. Tải Media
+        const media = globalSettings.media || {};
+        allImages = media.images || [];
+        allAudios = media.audios || [];
+        populateImageSidebar(); populateAudioSidebar();
+
+        // 3. Tải Chỉ mục Cây (Tree Index)
+        treeIndex = globalSettings.treeIndex || [];
+        if (treeIndex.length === 0) {
+            throw new Error('Không tìm thấy cây phả đồ nào trong data/db.json');
         }
-    } catch (err) {
-        console.error("Lỗi khi đồng bộ cây gia phả:", err);
-        alert("Đã xảy ra lỗi khi lưu dữ liệu vào Google Sheet. Chi tiết: " + (err.result?.error?.message || err.message));
+        populateTreeSelector();
+        
+        // 4. Tải cây phả đồ đầu tiên
+        const lastSelectedSheet = localStorage.getItem(LS_KEY_PREFIX + 'lastSelectedSheet');
+        const initialFileName = (treeIndex.find(t => t.fileName === lastSelectedSheet))?.fileName || (treeIndex[0]?.fileName);
+        
+        if (initialFileName) {
+            treeSelector.value = initialFileName;
+            await loadTreeData(initialFileName);
+        } else {
+            throw new Error("Không có cây phả đồ nào hợp lệ trong file db.json.");
+        }
+    } catch (e) {
+        alert('Không thể tải dữ liệu. Chi tiết: ' + e.message);
+        console.error(e);
+        data = null; 
+        scheduleRender();
+    } finally {
+        document.body.style.cursor = 'default';
     }
 }
+
+async function loadTreeData(fileName) {
+    if (!fileName) return;
+    currentTreeFileName = fileName;
+    document.body.style.cursor = 'wait';
+    data = null; 
+    allProposals = []; // Xóa đề xuất cũ
+    scheduleRender(); // Xóa canvas
+    
+    try {
+        const [treeData, proposalData] = await Promise.all([
+            fetchJSON(`${TREE_DATA_PATH}${fileName}`),
+            fetchJSON(PROPOSALS_FILE_PATH) // Luôn tải file đề xuất
+        ]);
+        
+        data = treeData || { id: '1', name: 'Gốc (Trống)', children: [] }; // Đảm bảo data không bao giờ null
+        allProposals = Array.isArray(proposalData) ? proposalData : [];
+        
+    } catch (e) {
+        console.error(`Lỗi khi tải dữ liệu:`, e);
+        alert(`Không thể tải phả đồ hoặc đề xuất. Một số dữ liệu có thể bị lỗi.`);
+        if (!data) data = { id: '1', name: 'Gốc (Lỗi)', children: [] }; // Cây bị lỗi
+        allProposals = []; // Đề xuất bị lỗi
+    } finally {
+        applyProposalsToTree();
+        try { 
+            updateLayout(); 
+        } catch (err) {
+            console.error("Lỗi layout:", err);
+            alert("Lỗi khi hiển thị cây: " + err.message);
+            data = null;
+        }
+        
+        fitToScreen(); 
+        const selectedTree = treeIndex.find(t => t.fileName === fileName);
+        savedTitle = selectedTree ? selectedTree.displayName : (globalSettings.settings.tree_title || 'Sơ Đồ Gia Phả');
+        document.title = savedTitle;
+        
+        localStorage.setItem(LS_KEY_PREFIX + 'lastSelectedSheet', fileName);
+        document.body.style.cursor = 'default';
+        history = []; future = [];
+        setUnsavedChanges(false);
+        if (isOwner) { $('#btnUndo').disabled = true; $('#btnRedo').disabled = true; }
+    }
+}
+
+// ... (Các hàm History: snapshot, pushHistory, undo, redo giữ nguyên) ...
 const snapshot = () => JSON.stringify(data);
 function pushHistory() {
   history.push(snapshot());
@@ -151,13 +296,15 @@ function redo() {
   $('#btnRedo').disabled = future.length === 0; $('#btnUndo').disabled = false;
 }
 
+// ===================================================================
+// ====== LOGIC VẼ & LAYOUT (Giữ nguyên) ======
+// ===================================================================
 function findById(n, id) { if (!n) return null; if (n.id === id) return n; for (const c of (n.children || [])) { const f = findById(c, id); if (f) return f; } return null; }
 function findParent(n, id, p = null) { if (!n) return null; if (n.id === id) return p; for (const c of (n.children || [])) { const f = findParent(c, id, n); if (f) return f; } return null; }
 function findPathToRoot(startNodeId) {
   if (!data || !startNodeId) return []; const path = []; let current = findById(data, startNodeId); if (!current) return []; path.push(current);
   while (true) { const parent = findParent(data, current.id); if (!parent) break; path.push(parent); current = parent; } return path;
 }
-
 function indexNodes() {
   nodesFlat = [];
   function walk(n){
@@ -168,7 +315,6 @@ function indexNodes() {
   }
   walk(data);
 }
-
 function measure(n, depth = 0, path = new Set()) {
     if (!n) return 0; if (path.has(n.id)) { console.error("Phát hiện vòng lặp:", n.id); return 0; } path.add(n.id);
     let nodeWidth;
@@ -236,27 +382,14 @@ function render() {
     ctx.clearRect(0, 0, treeCanvas.width, treeCanvas.height);
     
     if (!data) {
-        ctx.font = "18px sans-serif";
-        ctx.fillStyle = getCssVar('--ink');
-        ctx.textAlign = 'center';
-        ctx.fillText("Không có dữ liệu gia phả.", treeCanvas.width / 2, treeCanvas.height / 2);
-        ctx.restore();
-        updateStats();
-        updateNodeIcons();
-        return;
+        ctx.font = "18px sans-serif"; ctx.fillStyle = getCssVar('--ink');
+        ctx.textAlign = 'center'; ctx.fillText("Đang tải dữ liệu...", treeCanvas.width / 2, treeCanvas.height / 2);
+        ctx.restore(); updateStats(); updateNodeIcons(); return;
     }
-
-    ctx.translate(panX, panY);
-    ctx.scale(scale, scale);
-    
-    drawTree(data);
-    drawGenerations();
-
+    ctx.translate(panX, panY); ctx.scale(scale, scale);
+    drawTree(data); drawGenerations();
     ctx.restore(); 
-
-    updateNodeIcons();
-    updateDecoration();
-    updateStats();
+    updateNodeIcons(); updateDecoration(); updateStats();
 }
 function drawTree(node) {
     (node.children || []).forEach(child => { drawConnection(node, child); });
@@ -266,21 +399,14 @@ function drawTree(node) {
 function drawConnection(parent, child) {
     const path = findPathToRoot(highlightedNodeId);
     const isHighlighted = highlightedNodeId && path.some(p => p.id === parent.id) && path.some(p => p.id === child.id);
-
     ctx.beginPath();
     ctx.strokeStyle = isHighlighted ? getCssVar('--accent') : 'rgba(138,160,181,.7)';
-    ctx.lineWidth = isHighlighted ? 6 : 4;
-    ctx.lineCap = 'round';
-
+    ctx.lineWidth = isHighlighted ? 6 : 4; ctx.lineCap = 'round';
     const overlap = 6;
     const x1 = parent._x, y1 = parent._y + parent._h / 2 + overlap;
     const x2 = child._x, y2 = child._y - child._h / 2 - overlap;
     const midY = (y1 + y2) / 2;
-
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x1, midY);
-    ctx.lineTo(x2, midY);
-    ctx.lineTo(x2, y2);
+    ctx.moveTo(x1, y1); ctx.lineTo(x1, midY); ctx.lineTo(x2, midY); ctx.lineTo(x2, y2);
     ctx.stroke();
 }
 function drawNode(node) {
@@ -293,21 +419,14 @@ function drawNode(node) {
     
     ctx.save();
     if (isSearchFocus) {
-        ctx.translate(node._x, node._y);
-        ctx.scale(1.1, 1.1);
-        ctx.translate(-node._x, -node._y);
+        ctx.translate(node._x, node._y); ctx.scale(1.1, 1.1); ctx.translate(-node._x, -node._y);
     }
-
     ctx.shadowBlur = isHighlighted ? 20 : (isSearchFocus ? 30 : 15);
     ctx.shadowColor = isProposal ? getCssVar('--warning') : (isHighlighted ? getCssVar('--accent') : (isSearchFocus ? getCssVar('--warning') : 'rgba(0,0,0,.5)'));
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 5;
+    ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 5;
     
     const searchTerm = searchInput.value || '';
-    if (searchTerm && !node.isSearchMatch) {
-        ctx.globalAlpha = 0.40;
-    }
-
+    if (searchTerm && !node.isSearchMatch) { ctx.globalAlpha = 0.40; }
     const isSpecialDepth = node.depth === 0 || node.depth === 1;
     if (!isSpecialDepth) {
         ctx.fillStyle = getCssVar('--card');
@@ -315,12 +434,9 @@ function drawNode(node) {
         ctx.lineWidth = isProposal ? 3 : 2;
         ctx.beginPath();
         if(ctx.roundRect) ctx.roundRect(x, y, node._w, node._h, [15]); else ctx.rect(x, y, node._w, node._h);
-        ctx.fill();
-        ctx.stroke();
+        ctx.fill(); ctx.stroke();
     }
-
-    ctx.shadowBlur = 0;
-    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0; ctx.shadowColor = 'transparent';
     
     const name = node.name || 'Chưa đặt tên';
     let meta = '';
@@ -331,40 +447,28 @@ function drawNode(node) {
     ctx.textAlign = 'center';
     
     if (node.depth >= VERTICAL_THRESHOLD) {
-        ctx.textBaseline = 'middle';
-        ctx.font = `bold 18px sans-serif`;
-        ctx.save();
-        ctx.translate(node._x, node._y);
-        ctx.rotate(Math.PI / 2);
-        ctx.fillText(name, 0, 0);
-        ctx.restore();
-        
-        ctx.font = `13px sans-serif`;
-        ctx.fillStyle = getCssVar('--muted');
+        ctx.textBaseline = 'middle'; ctx.font = `bold 18px sans-serif`;
+        ctx.save(); ctx.translate(node._x, node._y); ctx.rotate(Math.PI / 2); ctx.fillText(name, 0, 0); ctx.restore();
+        ctx.font = `13px sans-serif`; ctx.fillStyle = getCssVar('--muted');
         ctx.fillText(meta, node._x, node._y + node._h / 2 - 15);
     } else {
         const fontSize = (node.depth === 0) ? 18 : 15;
         ctx.font = `bold ${fontSize}px sans-serif`;
-
         if (isSpecialDepth) {
-            const topOfNode = node._y - node._h / 2;
-            ctx.textBaseline = 'top';
+            const topOfNode = node._y - node._h / 2; ctx.textBaseline = 'top';
             ctx.fillText(name, node._x, topOfNode + 28);
             if (meta) {
                 ctx.font = `13px sans-serif`;
                 ctx.fillText(meta, node._x, topOfNode + 28 + fontSize * 1.3);
             }
         } else {
-            ctx.textBaseline = 'middle';
-            ctx.fillText(name, node._x, node._y - (meta ? 8 : 0));
+            ctx.textBaseline = 'middle'; ctx.fillText(name, node._x, node._y - (meta ? 8 : 0));
             if (meta) {
-                ctx.font = `13px sans-serif`;
-                ctx.fillStyle = getCssVar('--muted');
+                ctx.font = `13px sans-serif`; ctx.fillStyle = getCssVar('--muted');
                 ctx.fillText(meta, node._x, node._y + 12);
             }
         }
     }
-    
     ctx.restore();
 }
 function drawGenerations() {
@@ -372,51 +476,27 @@ function drawGenerations() {
     const maxDepth = getTreeDepth(data);
     for (let i = 0; i <= maxDepth; i++) {
         if (yPositions[i] === undefined) continue;
-        
-        ctx.save();
-        ctx.font = "bold 12px sans-serif";
-        ctx.fillStyle = getCssVar('--muted');
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        
-        const text = `Đời ${i + 1}`;
-        const textMetrics = ctx.measureText(text);
+        ctx.save(); ctx.font = "bold 12px sans-serif"; ctx.fillStyle = getCssVar('--muted');
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        const text = `Đời ${i + 1}`; const textMetrics = ctx.measureText(text);
         const padding = { x: 4, y: 8 };
         const rectW = textMetrics.actualBoundingBoxAscent + textMetrics.actualBoundingBoxDescent + padding.y * 2;
-        const rectH = textMetrics.width + padding.x * 2;
-        const rectX = 10;
+        const rectH = textMetrics.width + padding.x * 2; const rectX = 10;
         const rectY = yPositions[i] - rectH / 2;
-
-        ctx.fillStyle = getCssVar('--panel');
-        ctx.strokeStyle = getCssVar('--border');
-        ctx.lineWidth = 1;
+        ctx.fillStyle = getCssVar('--panel'); ctx.strokeStyle = getCssVar('--border'); ctx.lineWidth = 1;
         ctx.beginPath();
         if(ctx.roundRect) ctx.roundRect(rectX, rectY, rectW, rectH, [8]); else ctx.rect(rectX, rectY, rectW, rectH);
-        ctx.fill();
-        ctx.stroke();
-
+        ctx.fill(); ctx.stroke();
         ctx.fillStyle = getCssVar('--muted');
-        ctx.translate(rectX + rectW / 2, yPositions[i]);
-        ctx.rotate(Math.PI / 2);
-        ctx.fillText(text, 0, 0);
-        
+        ctx.translate(rectX + rectW / 2, yPositions[i]); ctx.rotate(Math.PI / 2); ctx.fillText(text, 0, 0);
         ctx.restore();
     }
 }
 function updateDecoration() {
-    if (!data || !decorationSettings.visible) {
-        treeDecoration.style.visibility = 'hidden';
-        return;
-    }
-
-    const worldX = data._x;
-    const worldY = data._y - data._h / 2 - decorationSettings.distance;
-
-    const screenX = (worldX * scale) + panX;
-    const screenY = (worldY * scale) + panY;
-    
+    if (!data || !decorationSettings.visible) { treeDecoration.style.visibility = 'hidden'; return; }
+    const worldX = data._x; const worldY = data._y - data._h / 2 - decorationSettings.distance;
+    const screenX = (worldX * scale) + panX; const screenY = (worldY * scale) + panY;
     const decorationSize = decorationSettings.size * scale;
-    
     const canvasRect = canvasContainer.getBoundingClientRect();
     if (screenX + decorationSize < 0 || screenX - decorationSize > canvasRect.width || screenY + decorationSize < 0 || screenY > canvasRect.height) {
         treeDecoration.style.visibility = 'hidden';
@@ -429,329 +509,86 @@ function updateDecoration() {
 }
 function updateNodeIcons() {
     const container = $('#node-icons-container');
-    if (!container || !data) {
-        if(container) container.innerHTML = '';
-        domNodeIcons.clear();
-        return;
-    }
-
+    if (!container || !data) { if(container) container.innerHTML = ''; domNodeIcons.clear(); return; }
     const visibleNodeIds = new Set();
-
     function walk(node) {
         if (node.depth === 0 || node.depth === 1) {
             visibleNodeIds.add(node.id);
             let imgEl = domNodeIcons.get(node.id);
-
             if (!imgEl) {
-                imgEl = document.createElement('img');
-                imgEl.className = 'node-icon';
+                imgEl = document.createElement('img'); imgEl.className = 'node-icon';
                 imgEl.src = 'https://cdn.jsdelivr.net/gh/nklinh102/gia-pha-files@main/images/Khungten.png';
-                container.appendChild(imgEl);
-                domNodeIcons.set(node.id, imgEl);
+                container.appendChild(imgEl); domNodeIcons.set(node.id, imgEl);
             }
-
             const iconW = (node.depth === 0 ? 350 : 300) * scale;
             const iconH = (node.depth === 0 ? 100 : 90) * scale;
-            const screenX = (node._x * scale) + panX;
-            const screenY = (node._y * scale) + panY;
-
+            const screenX = (node._x * scale) + panX; const screenY = (node._y * scale) + panY;
             imgEl.style.transform = `translate(${screenX - iconW / 2}px, ${screenY - iconH / 2}px)`;
-            imgEl.style.width = iconW + 'px';
-            imgEl.style.height = iconH + 'px';
+            imgEl.style.width = iconW + 'px'; imgEl.style.height = iconH + 'px';
         }
         (node.children || []).forEach(walk);
     }
     walk(data);
-
     for (const [id, el] of domNodeIcons.entries()) {
-        if (!visibleNodeIds.has(id)) {
-            el.remove();
-            domNodeIcons.delete(id);
-        }
+        if (!visibleNodeIds.has(id)) { el.remove(); domNodeIcons.delete(id); }
     }
 }
 function resizeCanvas() {
     const rect = canvasContainer.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
     if (treeCanvas.width !== rect.width * dpr || treeCanvas.height !== rect.height * dpr) {
-        treeCanvas.width = rect.width * dpr;
-        treeCanvas.height = rect.height * dpr;
+        treeCanvas.width = rect.width * dpr; treeCanvas.height = rect.height * dpr;
         ctx.scale(dpr, dpr);
-        treeCanvas.style.width = rect.width + 'px';
-        treeCanvas.style.height = rect.height + 'px';
+        treeCanvas.style.width = rect.width + 'px'; treeCanvas.style.height = rect.height + 'px';
         scheduleRender();
     }
 }
 
-function updateSelectionActions() {
-    const panel = $('#selection-actions');
-    const actionsGrid = panel.querySelector('.actions-grid');
-    if (!panel || !actionsGrid) return;
+// ===================================================================
+// ====== TẢI FILE LÊN (GITHUB) ======
+// ===================================================================
 
-    actionsGrid.innerHTML = ''; 
-
-    if (highlightedNodeId && isOwner) {
-        const node = findById(data, highlightedNodeId);
-        if (node) {
-            $('#selection-name-value').textContent = node.name;
-            const avatarEl = $('#selection-avatar');
-            if (node.avatarUrl) {
-                avatarEl.style.backgroundImage = `url(${node.avatarUrl})`;
-                avatarEl.innerHTML = '';
-            } else {
-                avatarEl.style.backgroundImage = 'none';
-                avatarEl.innerHTML = '&#43;';
-            }
-            avatarEl.onclick = () => onEditAvatar(node);
-
-            if (node.isProposal) {
-                const acceptBtn = document.createElement('button');
-                acceptBtn.className = 'btn btn-accept';
-                acceptBtn.innerHTML = `Chấp nhận`;
-                acceptBtn.onclick = () => onAcceptProposal(node);
-
-                const rejectBtn = document.createElement('button');
-                rejectBtn.className = 'btn btn-reject';
-                rejectBtn.innerHTML = `Từ chối`;
-                rejectBtn.onclick = () => onRejectProposal(node);
-
-                actionsGrid.append(acceptBtn, rejectBtn);
-
-            } else {
-                const addChildBtn = document.createElement('button');
-                addChildBtn.className = 'btn';
-                addChildBtn.id = 'act-add-child';
-                addChildBtn.innerHTML = `<svg fill='none' height='16' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' viewBox='0 0 24 24' width='16'><path d='M6 3v12'/><path d='M18 9v12'/><path d='M3 15h18'/><path d='M14 21v-5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v5'/></svg> Thêm con`;
-                addChildBtn.onclick = () => onAdd(node);
-
-                const editBtn = document.createElement('button');
-                editBtn.className = 'btn';
-                editBtn.id = 'act-edit-node';
-                editBtn.innerHTML = `<svg fill='none' height='16' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' viewBox='0 0 24 24' width='16'><path d='M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z'/></svg> Sửa`;
-                editBtn.onclick = () => onEdit(node);
-
-                const deleteBtn = document.createElement('button');
-                deleteBtn.className = 'btn';
-                deleteBtn.id = 'act-delete-node';
-                deleteBtn.style.background = 'var(--danger)';
-                deleteBtn.style.color = 'white';
-                deleteBtn.innerHTML = `<svg fill='none' height='16' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' viewBox='0 0 24 24' width='16'><polyline points='3 6 5 6 21 6'/><path d='M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'/><line x1='10' x2='10' y1='11' y2='17'/><line x1='14' x2='14' y1='11' y2='17'/></svg> Xóa`;
-                deleteBtn.onclick = () => onDel(node);
-
-                actionsGrid.append(addChildBtn, editBtn, deleteBtn);
-            }
-            panel.classList.remove('hidden');
-        } else {
-            panel.classList.add('hidden');
-        }
-    } else {
-        panel.classList.add('hidden');
-    }
-}
-
-function getGiap(node) {
-    if (!data || !node || node.depth < 1) {
-        return 'N/A';
-    }
-
-    let current = node;
-    let parent = findParent(data, current.id);
-
-    while (parent && current.depth > 1) {
-        current = parent;
-        parent = findParent(data, current.id);
-    }
+async function uploadImageToGitHub(file) {
+    const reader = new FileReader();
+    const readAsBase64 = new Promise((resolve, reject) => {
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
+        reader.readAsDataURL(file);
+    });
     
-    const gen2Ancestor = current;
-
-    if (gen2Ancestor && gen2Ancestor.depth === 1 && data.children) {
-        const giapIndex = data.children.findIndex(child => child.id === gen2Ancestor.id);
-        if (giapIndex !== -1) {
-            return giapIndex + 1;
-        }
-    }
-
-    return 'N/A';
-}
-
-// THAY THẾ TOÀN BỘ HÀM updateInfoPanel CŨ BẰNG HÀM NÀY
-
-function updateInfoPanel(nodeId) {
-    const panel = $('#info-panel');
-    if (!panel) return;
-    
-    const existingBtn = $('#act-propose-child');
-    if(existingBtn) existingBtn.remove();
-
-    if (!nodeId || isOwner) {
-        panel.classList.add('hidden');
-        return;
-    }
-
-    const node = findById(data, nodeId);
-    if (!node) {
-        panel.classList.add('hidden');
-        return;
-    }
-
-    $('#info-name').textContent = node.name || 'N/A';
-
-    const avatarContainer = $('#info-avatar');
-    // === PHẦN CHỈNH SỬA BẮT ĐẦU TỪ ĐÂY ===
-    if (node.avatarUrl) {
-        // Nếu có ảnh, hiển thị ô tròn và đặt ảnh nền
-        avatarContainer.style.display = 'block'; 
-        avatarContainer.style.backgroundImage = `url(${node.avatarUrl})`;
-    } else {
-        // Nếu không có ảnh, ẩn hoàn toàn ô tròn đi
-        avatarContainer.style.display = 'none'; 
-    }
-    // === KẾT THÚC PHẦN CHỈNH SỬA ===
-
-    $('#info-generation').textContent = `Giáp ${getGiap(node)} / Đời ${node.depth + 1}`;
-    $('#info-sons').textContent = `${(node.children || []).length} con trai`;
-
-    let olderBrothers = 0, youngerBrothers = 0;
-    const parent = findParent(data, node.id);
-    if (parent && parent.children) {
-        const nodeIndex = parent.children.findIndex(child => child.id === node.id);
-        if (nodeIndex > -1) {
-            olderBrothers = nodeIndex;
-            youngerBrothers = parent.children.length - 1 - nodeIndex;
-        }
-    }
-    $('#info-brothers').textContent = `${olderBrothers} anh trai và ${youngerBrothers} em trai`;
-    
-    const birthItem = $('#info-birth-item');
-    if (node.birth) {
-        $('#info-birth').textContent = node.birth;
-        birthItem.style.display = 'block';
-    } else {
-        birthItem.style.display = 'none';
-    }
-
-    const deathItem = $('#info-death-item');
-    if (node.death) {
-        $('#info-death').textContent = node.death;
-        deathItem.style.display = 'block';
-    } else {
-        deathItem.style.display = 'none';
-    }
-
-    if (!isOwner && node) {
-        const proposalBtn = document.createElement('button');
-        proposalBtn.id = 'act-propose-child';
-        proposalBtn.className = 'btn';
-        proposalBtn.innerHTML = `&#43; Đề xuất thêm con`;
-        
-        proposalBtn.onclick = () => onProposeChild(node);
-        panel.appendChild(proposalBtn);
-    }
-
-    panel.classList.remove('hidden');
-}
-
-function getCoordsFromEvent(e) {
-    const rect = treeCanvas.getBoundingClientRect();
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    const canvasX = clientX - rect.left;
-    const canvasY = clientY - rect.top;
-    const worldX = (canvasX - panX) / scale;
-    const worldY = (canvasY - panY) / scale;
-    return { worldX, worldY };
-}
-function getNodeAtPoint(worldX, worldY) {
-    let found = null;
-    function check(node) {
-        const x1 = node._x - node._w / 2;
-        const y1 = node._y - node._h / 2;
-        const x2 = node._x + node._w / 2;
-        const y2 = node._y + node._h / 2;
-        if (worldX >= x1 && worldX <= x2 && worldY >= y1 && worldY <= y2) {
-            found = node;
-        }
-        if (!found) {
-            (node.children || []).forEach(check);
-        }
-    }
-    if (data) check(data);
-    return found;
-}
-function handleCanvasClick(e) {
-    e.preventDefault();
-    const { worldX, worldY } = getCoordsFromEvent(e);
-    const node = getNodeAtPoint(worldX, worldY);
-
-    if (node) {
-        highlightedNodeId = (highlightedNodeId === node.id) ? null : node.id;
-    } else {
-        highlightedNodeId = null;
-    }
-    
-    updateSelectionActions();
-    updateInfoPanel(highlightedNodeId);
-    scheduleRender();
-}
-function handleCanvasMouseMove(e) {
-    const { worldX, worldY } = getCoordsFromEvent(e);
-    const node = getNodeAtPoint(worldX, worldY);
-    const newHoveredId = node ? node.id : null;
-    if (newHoveredId !== hoveredNodeId) {
-        hoveredNodeId = newHoveredId;
-        canvasContainer.style.cursor = node ? 'pointer' : 'default';
-    }
-}
-
-function updateStats() {
-  const statsContainer = $('#stats-content');
-  if (!data) { statsContainer.innerHTML = ''; return; }
-  const counts = [];
-  (function traverse(node, depth) { if (!node) return; if(!node.isProposal) {counts[depth] = (counts[depth] || 0) + 1;} (node.children || []).forEach(child => traverse(child, depth + 1)); })(data, 0);
-  let html = ''; let total = 0;
-  counts.forEach((count, index) => { if(count > 0) {html += `<div><span>Đời ${index + 1}</span> <strong>${count}</strong></div>`; total += count;} });
-  html += `<div class="total-row"><span><strong>Tổng cộng</strong></span> <strong>${total}</strong></div>`;
-  statsContainer.innerHTML = html;
-}
-
-async function uploadImageToCloudinary(file) {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-    formData.append('folder', 'avatar');
+    const fileContent = await readAsBase64; // "data:image/jpeg;base64,..."
+    const fileName = `media/avatars/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
 
     const saveBtn = $('#mSave');
     const originalBtnText = saveBtn.textContent;
     saveBtn.disabled = true;
     saveBtn.textContent = 'Đang tải ảnh...';
 
-    const apiUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+    const { success, data } = await callAdminFunction('upload-media', {
+        path: fileName,
+        content: fileContent
+    });
 
-    try {
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            body: formData,
-        });
+    saveBtn.disabled = false;
+    saveBtn.textContent = originalBtnText;
 
-        if (!response.ok) {
-            throw new Error('Tải ảnh lên Cloudinary thất bại. Vui lòng thử lại.');
-        }
-
-        const data = await response.json();
-        return data.secure_url;
-    } catch (error) {
-        console.error('Lỗi Cloudinary:', error);
-        alert(error.message);
+    if (success) {
+        return data.url; // Trả về URL của jsDelivr
+    } else {
         return null;
-    } finally {
-        saveBtn.disabled = false;
-        saveBtn.textContent = originalBtnText;
     }
 }
 
+// ===================================================================
+// ====== MODAL & CRUD ======
+// ===================================================================
 function openModal(title, init, onSave) {
   const modal = $('#modal'), mTitle = $('#mTitle'), mName = $('#mName'), mBirth = $('#mBirth'), mDeath = $('#mDeath'), mNote = $('#mNote'), mAvatar = $('#mAvatar');
   mTitle.textContent = title; mName.value = init?.name || ''; mBirth.value = init?.birth || ''; mDeath.value = init?.death || ''; mNote.value = init?.note || ''; mAvatar.value = init?.avatarUrl || '';
+  
+  // Chỉ admin mới thấy nút tải file (nhưng khách vẫn có thể dán link)
+  $('#mAvatarFile').style.display = isOwner ? 'block' : 'none';
+
   modal.classList.add('show');
   const btnSave = $('#mSave'), btnCancel = $('#mCancel');
   function cleanup() { modal.classList.remove('show'); btnSave.removeEventListener('click', saveHandler); btnCancel.removeEventListener('click', close); modal.removeEventListener('click', outside); document.removeEventListener('keydown', esc); }
@@ -771,23 +608,20 @@ function openConfirm(message, onYes) {
   function outside(e) { if (e.target === c) off(); } function esc(e) { if (e.key === 'Escape') off(); }
   yes.addEventListener('click', on); no.addEventListener('click', off); c.addEventListener('click', outside); document.addEventListener('keydown', esc);
 }
+
 function onAdd(n) { if (!isOwner) return;
   openModal('Thêm con cho ' + n.name, {}, (d) => { pushHistory(); if (!n.children) n.children = []; n.children.push({ id: generateHierarchicalId(n), ...d, children: [] }); setUnsavedChanges(true); updateLayout(); scheduleRender(); });
 }
 function onEdit(n) { if (!isOwner) return;
   openModal('Chỉnh sửa: ' + n.name, n, (d) => { 
-    pushHistory(); 
-    Object.assign(n, d); 
-    setUnsavedChanges(true);
-    updateLayout();
-    scheduleRender(); 
+    pushHistory(); Object.assign(n, d); setUnsavedChanges(true);
+    updateLayout(); scheduleRender(); 
   });
 }
 function onEditAvatar(n) { if (!isOwner) return;
-    onEdit(n);
+    onEdit(n); // Mở modal chỉnh sửa
     const fileInput = $('#mAvatarFile');
-    fileInput.value = '';
-    fileInput.click();
+    fileInput.value = ''; fileInput.click();
 }
 function onDel(n) { if (!isOwner) return;
   const msg = data.id === n.id ? 'Xóa gốc sẽ xóa toàn bộ cây. Bạn chắc chứ?' : 'Xóa thành viên này và toàn bộ nhánh con?';
@@ -795,15 +629,306 @@ function onDel(n) { if (!isOwner) return;
     pushHistory();
     if (data.id === n.id) { data = null; }
     else { const p = findParent(data, n.id); if (p && p.children) p.children = p.children.filter(c => c.id !== n.id); }
-    highlightedNodeId = null;
-    updateSelectionActions();
-    updateInfoPanel(null);
-    setUnsavedChanges(true);
-    updateLayout();
-    scheduleRender();
+    highlightedNodeId = null; updateSelectionActions(); updateInfoPanel(null);
+    setUnsavedChanges(true); updateLayout(); scheduleRender();
   });
 }
 
+// ===================================================================
+// ====== CHỨC NĂNG ĐỀ XUẤT ======
+// ===================================================================
+
+function applyProposalsToTree() {
+    if (!data) return;
+    let loadedCount = 0;
+    
+    allProposals.forEach((proposal, index) => {
+        if (proposal.treeFileName === currentTreeFileName) {
+            const parentNode = findById(data, proposal.parentId);
+            if (parentNode) {
+                loadedCount++;
+                const proposalNode = {
+                    ...proposal,
+                    id: proposal.proposalId,
+                    isProposal: true,
+                    proposalIndex: index // Vị trí trong mảng allProposals
+                };
+                if (!parentNode.children) parentNode.children = [];
+                parentNode.children.push(proposalNode);
+            } else {
+                console.warn(`Không tìm thấy node cha '${proposal.parentId}' cho đề xuất.`);
+            }
+        }
+    });
+    console.log(`Đã tải ${loadedCount} đề xuất cho cây này.`);
+}
+
+function updateInfoPanel(nodeId) {
+    const panel = $('#info-panel');
+    if (!panel) return;
+    
+    const existingBtn = $('#act-propose-child');
+    if(existingBtn) existingBtn.remove();
+
+    if (!nodeId || isOwner) { // Admin không thấy
+        panel.classList.add('hidden'); return;
+    }
+    const node = findById(data, nodeId);
+    if (!node || node.isProposal) { // Khách không thấy node đề xuất
+        panel.classList.add('hidden'); return;
+    }
+
+    $('#info-name').textContent = node.name || 'N/A';
+    const avatarContainer = $('#info-avatar');
+    if (node.avatarUrl) {
+        avatarContainer.style.display = 'block'; 
+        avatarContainer.style.backgroundImage = `url(${node.avatarUrl})`;
+    } else {
+        avatarContainer.style.display = 'none'; 
+    }
+    $('#info-generation').textContent = `Giáp ${getGiap(node)} / Đời ${node.depth + 1}`;
+    $('#info-sons').textContent = `${(node.children || []).length} con trai`;
+    let olderBrothers = 0, youngerBrothers = 0;
+    const parent = findParent(data, node.id);
+    if (parent && parent.children) {
+        const nodeIndex = parent.children.findIndex(child => child.id === node.id);
+        if (nodeIndex > -1) {
+            olderBrothers = nodeIndex;
+            youngerBrothers = parent.children.length - 1 - nodeIndex;
+        }
+    }
+    $('#info-brothers').textContent = `${olderBrothers} anh trai và ${youngerBrothers} em trai`;
+    
+    const birthItem = $('#info-birth-item');
+    if (node.birth) { $('#info-birth').textContent = node.birth; birthItem.style.display = 'block'; }
+    else { birthItem.style.display = 'none'; }
+    const deathItem = $('#info-death-item');
+    if (node.death) { $('#info-death').textContent = node.death; deathItem.style.display = 'block'; }
+    else { deathItem.style.display = 'none'; }
+    
+    // Thêm nút "Đề xuất thêm con" cho khách
+    const proposalBtn = document.createElement('button');
+    proposalBtn.id = 'act-propose-child';
+    proposalBtn.className = 'btn';
+    proposalBtn.innerHTML = `&#43; Đề xuất thêm con`;
+    proposalBtn.onclick = () => onProposeChild(node);
+    panel.appendChild(proposalBtn);
+
+    panel.classList.remove('hidden');
+}
+
+function updateSelectionActions() {
+    const panel = $('#selection-actions');
+    const actionsGrid = panel.querySelector('.actions-grid');
+    if (!panel || !actionsGrid) return;
+
+    actionsGrid.innerHTML = ''; 
+    if (!highlightedNodeId || !isOwner) { // Chỉ admin mới thấy
+        panel.classList.add('hidden'); return;
+    }
+
+    const node = findById(data, highlightedNodeId);
+    if (node) {
+        $('#selection-name-value').textContent = node.name;
+        const avatarEl = $('#selection-avatar');
+        if (node.avatarUrl) {
+            avatarEl.style.backgroundImage = `url(${node.avatarUrl})`; avatarEl.innerHTML = '';
+        } else {
+            avatarEl.style.backgroundImage = 'none'; avatarEl.innerHTML = '&#43;';
+        }
+        avatarEl.onclick = () => onEditAvatar(node);
+
+        if (node.isProposal) {
+            const acceptBtn = document.createElement('button');
+            acceptBtn.className = 'btn btn-accept'; acceptBtn.innerHTML = `Chấp nhận`;
+            acceptBtn.onclick = () => onAcceptProposal(node);
+            const rejectBtn = document.createElement('button');
+            rejectBtn.className = 'btn btn-reject'; rejectBtn.innerHTML = `Từ chối`;
+            rejectBtn.onclick = () => onRejectProposal(node);
+            actionsGrid.append(acceptBtn, rejectBtn);
+        } else {
+            const addChildBtn = document.createElement('button');
+            addChildBtn.className = 'btn'; addChildBtn.id = 'act-add-child';
+            addChildBtn.innerHTML = `<svg fill='none' height='16' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' viewBox='0 0 24 24' width='16'><path d='M6 3v12'/><path d='M18 9v12'/><path d='M3 15h18'/><path d='M14 21v-5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v5'/></svg> Thêm con`;
+            addChildBtn.onclick = () => onAdd(node);
+            const editBtn = document.createElement('button');
+            editBtn.className = 'btn'; editBtn.id = 'act-edit-node';
+            editBtn.innerHTML = `<svg fill='none' height='16' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' viewBox='0 0 24 24' width='16'><path d='M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z'/></svg> Sửa`;
+            editBtn.onclick = () => onEdit(node);
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'btn'; deleteBtn.id = 'act-delete-node';
+            deleteBtn.style.background = 'var(--danger)'; deleteBtn.style.color = 'white';
+            deleteBtn.innerHTML = `<svg fill='none' height='16' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' viewBox='0 0 24 24' width='16'><polyline points='3 6 5 6 21 6'/><path d='M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'/><line x1='10' x2='10' y1='11' y2='17'/><line x1='14' x2='14' y1='11' y2='17'/></svg> Xóa`;
+            deleteBtn.onclick = () => onDel(node);
+            actionsGrid.append(addChildBtn, editBtn, deleteBtn);
+        }
+        panel.classList.remove('hidden');
+    } else {
+        panel.classList.add('hidden');
+    }
+}
+
+function onProposeChild(parentNode) {
+    openModal('Đề xuất thêm con cho ' + parentNode.name, {}, async (newData) => {
+        const tempChildNode = {
+            proposalId: 'proposal_' + Date.now(),
+            treeFileName: currentTreeFileName, // Quan trọng
+            parentId: parentNode.id,
+            name: newData.name,
+            birth: newData.birth,
+            death: newData.death,
+            note: newData.note,
+            avatarUrl: newData.avatarUrl
+        };
+
+        // Gửi lên Netlify Function (public)
+        try {
+            const response = await fetch('/.netlify/functions/submit-proposal', {
+                method: 'POST',
+                body: JSON.stringify(tempChildNode)
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.message);
+
+            // Thêm ngay vào UI để khách thấy
+            const proposalNode = { ...tempChildNode, id: tempChildNode.proposalId, isProposal: true };
+            if (!parentNode.children) parentNode.children = [];
+            parentNode.children.push(proposalNode);
+            // Thêm vào mảng tổng
+            allProposals.push(tempChildNode);
+            
+            updateLayout();
+            scheduleRender();
+            alert('Đã gửi đề xuất của bạn. Quản trị viên sẽ phê duyệt sớm.');
+
+        } catch (err) {
+            console.error("Lỗi khi gửi đề xuất:", err);
+            alert("Lỗi khi gửi đề xuất: " + err.message);
+        }
+    });
+}
+
+async function onAcceptProposal(node) {
+    pushHistory();
+    
+    // 1. Xóa khỏi mảng allProposals
+    const proposalIndex = allProposals.findIndex(p => p.proposalId === node.id);
+    if (proposalIndex > -1) {
+        allProposals.splice(proposalIndex, 1);
+    }
+    
+    // 2. Chuyển thành node chính thức
+    delete node.isProposal;
+    delete node.proposalIndex;
+    delete node.treeFileName;
+    delete node.proposalId;
+    node.id = generateHierarchicalId(findParent(data, node.id)); // Tạo ID mới
+    
+    setUnsavedChanges(true); // Bật nút lưu chính
+    await saveAllChanges(); // Lưu lại cả 2 file (cây và đề xuất)
+
+    highlightedNodeId = null;
+    updateSelectionActions();
+    updateLayout(); // Cập nhật layout (vì ID đã thay đổi)
+    scheduleRender();
+}
+
+async function onRejectProposal(node) {
+    pushHistory();
+
+    // 1. Xóa khỏi mảng allProposals
+    const proposalIndex = allProposals.findIndex(p => p.proposalId === node.id);
+    if (proposalIndex > -1) {
+        allProposals.splice(proposalIndex, 1);
+    }
+
+    // 2. Xóa node khỏi cây (UI)
+    const parent = findParent(data, node.id);
+    if (parent && parent.children) {
+        parent.children = parent.children.filter(c => c.id !== node.id);
+    }
+    
+    // 3. Chỉ lưu lại file đề xuất
+    const proposalsPayload = { filePath: PROPOSALS_FILE_PATH, data: allProposals };
+    const { success } = await callAdminFunction('save-data', proposalsPayload);
+
+    if (success) {
+        alert('Đã từ chối đề xuất.');
+    } else {
+        alert('Lỗi khi từ chối. Vui lòng thử lại.');
+    }
+    
+    highlightedNodeId = null;
+    updateSelectionActions();
+    updateLayout();
+    scheduleRender();
+}
+
+// ===================================================================
+// ====== TƯƠNG TÁC (Giữ nguyên) ======
+// ===================================================================
+function getCoordsFromEvent(e) {
+    const rect = treeCanvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const canvasX = clientX - rect.left; const canvasY = clientY - rect.top;
+    const worldX = (canvasX - panX) / scale; const worldY = (canvasY - panY) / scale;
+    return { worldX, worldY };
+}
+function getNodeAtPoint(worldX, worldY) {
+    let found = null;
+    function check(node) {
+        const x1 = node._x - node._w / 2; const y1 = node._y - node._h / 2;
+        const x2 = node._x + node._w / 2; const y2 = node._y + node._h / 2;
+        if (worldX >= x1 && worldX <= x2 && worldY >= y1 && worldY <= y2) { found = node; }
+        if (!found) { (node.children || []).forEach(check); }
+    }
+    if (data) check(data);
+    return found;
+}
+function handleCanvasClick(e) {
+    e.preventDefault();
+    const { worldX, worldY } = getCoordsFromEvent(e);
+    const node = getNodeAtPoint(worldX, worldY);
+    highlightedNodeId = (node && node.id === highlightedNodeId) ? null : (node ? node.id : null);
+    updateSelectionActions();
+    updateInfoPanel(highlightedNodeId);
+    scheduleRender();
+}
+function handleCanvasMouseMove(e) {
+    const { worldX, worldY } = getCoordsFromEvent(e);
+    const node = getNodeAtPoint(worldX, worldY);
+    const newHoveredId = node ? node.id : null;
+    if (newHoveredId !== hoveredNodeId) {
+        hoveredNodeId = newHoveredId;
+        canvasContainer.style.cursor = node ? 'pointer' : 'default';
+    }
+}
+function updateStats() {
+  const statsContainer = $('#stats-content');
+  if (!data) { statsContainer.innerHTML = ''; return; }
+  const counts = [];
+  (function traverse(node, depth) { if (!node) return; if(!node.isProposal) {counts[depth] = (counts[depth] || 0) + 1;} (node.children || []).forEach(child => traverse(child, depth + 1)); })(data, 0);
+  let html = ''; let total = 0;
+  counts.forEach((count, index) => { if(count > 0) {html += `<div><span>Đời ${index + 1}</span> <strong>${count}</strong></div>`; total += count;} });
+  html += `<div class="total-row"><span><strong>Tổng cộng</strong></span> <strong>${total}</strong></div>`;
+  statsContainer.innerHTML = html;
+}
+function getGiap(node) {
+    if (!data || !node || node.depth < 1) { return 'N/A'; }
+    let current = node; let parent = findParent(data, current.id);
+    while (parent && current.depth > 1) { current = parent; parent = findParent(data, current.id); }
+    const gen2Ancestor = current;
+    if (gen2Ancestor && gen2Ancestor.depth === 1 && data.children) {
+        const giapIndex = data.children.findIndex(child => child.id === gen2Ancestor.id);
+        if (giapIndex !== -1) { return giapIndex + 1; }
+    }
+    return 'N/A';
+}
+
+// ===================================================================
+// ====== IMPORT/EXPORT (Giữ nguyên) ======
+// ===================================================================
 function download(filename, data, type) {
     const a = document.createElement('a');
     let url;
@@ -813,9 +938,7 @@ function download(filename, data, type) {
         const blob = new Blob([data], { type: type || 'application/octet-stream' });
         url = URL.createObjectURL(blob);
     }
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
+    a.href = url; a.download = filename; document.body.appendChild(a);
     a.click();
     if (typeof url !== 'string' || !url.startsWith('data:')) {
         setTimeout(() => URL.revokeObjectURL(url), 100);
@@ -823,10 +946,10 @@ function download(filename, data, type) {
     document.body.removeChild(a);
 }
 function toCSV() {
-  if(!data) return ''; const rows = [['id', 'parentId', 'name', 'birth', 'death', 'note']];
+  if(!data) return ''; const rows = [['id', 'parentId', 'name', 'birth', 'death', 'note', 'avatarUrl']];
   (function walk(node, parentId = '') {
       if(node.isProposal) return; 
-      rows.push([node.id, parentId, node.name, node.birth, node.death, node.note].map(v => { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }));
+      rows.push([node.id, parentId, node.name, node.birth, node.death, node.note, node.avatarUrl].map(v => { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }));
      (node.children || []).forEach(c => walk(c, node.id));
   })(data); return rows.map(row => row.join(',')).join('\n');
 }
@@ -883,109 +1006,64 @@ function generateSVGString() {
     <style> rect { fill: ${getCssVar('--card')}; stroke: ${getCssVar('--border')}; } .name { font: bold 15px sans-serif; fill: ${getCssVar('--ink')}; } .meta { font: 13px sans-serif; fill: ${getCssVar('--muted')}; } path { stroke: rgba(138,160,181,.7); stroke-width: 4; fill: none; } </style>
     <g>${paths}</g><g>${nodesSVG}</g></svg>`;
 }
-
 async function convertSVGtoJPG(svgString, quality = 0.9) { 
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    const img = new Image();
-    const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' }); 
+    const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
+    const img = new Image(); const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' }); 
     const url = URL.createObjectURL(svgBlob);
     const loadImagePromise = new Promise((resolve, reject) => {
-        img.onload = () => resolve();
-        img.onerror = (err) => reject(err);
+        img.onload = () => resolve(); img.onerror = (err) => reject(err);
         img.src = url;
     });
-    await loadImagePromise;
-    URL.revokeObjectURL(url);
-    canvas.width = img.width;
-    canvas.height = img.height;
-    ctx.fillStyle = getCssVar('--bg');
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0);
-    return canvas.toDataURL('image/jpeg', quality);
+    await loadImagePromise; URL.revokeObjectURL(url);
+    canvas.width = img.width; canvas.height = img.height;
+    ctx.fillStyle = getCssVar('--bg'); ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0); return canvas.toDataURL('image/jpeg', quality);
 }
-
 $('#btnExportSVG').onclick = () => { const svgString = generateSVGString(); if (svgString) download('gia-pha.svg', svgString, 'image/svg+xml'); else alert('Chưa có dữ liệu.'); };
 $('#btnExportJPG').onclick = async () => {
-    const btn = $('#btnExportJPG');
-    btn.disabled = true;
-    btn.textContent = 'Đang xử lý...';
+    const btn = $('#btnExportJPG'); btn.disabled = true; btn.textContent = 'Đang xử lý...';
     try {
-        const svgString = generateSVGString();
-        if (!svgString) {
-            alert('Chưa có dữ liệu để xuất.');
-            return;
-        }
+        const svgString = generateSVGString(); if (!svgString) { alert('Chưa có dữ liệu để xuất.'); return; }
         const jpgDataUrl = await convertSVGtoJPG(svgString); 
         download('gia-pha.jpg', jpgDataUrl);
-    } catch (err) {
-        console.error('Lỗi chuyển đổi SVG sang JPG:', err);
-        alert('Đã xảy ra lỗi khi chuyển đổi file.');
-    } finally {
-        btn.disabled = false;
-        btn.textContent = 'Xuất JPG';
-    }
+    } catch (err) { console.error('Lỗi chuyển đổi SVG sang JPG:', err); alert('Đã xảy ra lỗi khi chuyển đổi file.'); }
+    finally { btn.disabled = false; btn.textContent = 'Xuất JPG'; }
 };
-
 $('#btnReset').onclick = () => { if (!isOwner) return; openConfirm('Xóa toàn bộ dữ liệu?', () => { pushHistory(); data = null; highlightedNodeId = null; updateSelectionActions(); setUnsavedChanges(true); updateLayout(); scheduleRender(); }); };
 $('#btnRoot').onclick = () => { if (!isOwner) return; if(data) return alert('Cây đã có gốc.'); pushHistory(); data = { id: generateHierarchicalId(null), name: 'Tổ tiên', birth: '1900', children: [] }; setUnsavedChanges(true); updateLayout(); scheduleRender(); };
 $('#btnUndo').onclick = undo; $('#btnRedo').onclick = redo;
 
+// ===================================================================
+// ====== TÌM KIẾM, ZOOM, FIT (Giữ nguyên) ======
+// ===================================================================
 let searchTimeout;
 searchInput.addEventListener('input', (e) => {
   clearTimeout(searchTimeout);
   const v = (e.target.value || '').trim();
   btnClearSearch.style.display = v ? 'block' : 'none';
-  if (v.length < MIN_QUERY) {
-    clearSearchFlags();
-    scheduleRender();
-    return;
-  }
+  if (v.length < MIN_QUERY) { clearSearchFlags(); scheduleRender(); return; }
   searchTimeout = setTimeout(() => applySearch(false), SEARCH_DEBOUNCE);
 });
-
 btnClearSearch.addEventListener('click', () => {
-  searchInput.value = '';
-  btnClearSearch.style.display = 'none';
-  clearSearchFlags();
-  scheduleRender();
-  searchInput.focus();
+  searchInput.value = ''; btnClearSearch.style.display = 'none';
+  clearSearchFlags(); scheduleRender(); searchInput.focus();
 });
-
 searchInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') {
-      e.preventDefault();
-      applySearch(true);
-  }
+  if (e.key === 'Enter') { e.preventDefault(); applySearch(true); }
 });
-
 function clearSearchFlags() {
-  if (data) {
-      nodesFlat.forEach(n => {
-          n.isSearchMatch = false;
-          n.isSearchFocus = false;
-      });
-  }
+  if (data) { nodesFlat.forEach(n => { n.isSearchMatch = false; n.isSearchFocus = false; }); }
 }
-
 function applySearch(shouldCenter) {
-  const q = norm(searchInput.value || '');
-  let first = null;
+  const q = norm(searchInput.value || ''); let first = null;
   nodesFlat.forEach(n => {
     const m = !!(n._norm && n._norm.includes(q));
-    n.isSearchMatch = m;
-    n.isSearchFocus = false;
-    if (m && !first) {
-      first = n;
-      n.isSearchFocus = true;
-    }
+    n.isSearchMatch = m; n.isSearchFocus = false;
+    if (m && !first) { first = n; n.isSearchFocus = true; }
   });
-  if (first && shouldCenter) {
-      centerOnNode(first, { animate: true });
-  }
+  if (first && shouldCenter) { centerOnNode(first, { animate: true }); }
   scheduleRender();
 }
-
 function centerOnNode(node, opts = { animate: true }) {
     if (!node || typeof node._x === 'undefined') return;
     const rect = canvasContainer.getBoundingClientRect();
@@ -994,8 +1072,7 @@ function centerOnNode(node, opts = { animate: true }) {
     if (!opts.animate) {
         panX = end.x; panY = end.y; scale = end.s;
         $('#zoomReset').textContent = Math.round(scale * 100) + '%';
-        scheduleRender();
-        return;
+        scheduleRender(); return;
     }
     if (panAnimId) cancelAnimationFrame(panAnimId);
     const start = { x: panX, y: panY, s: scale };
@@ -1009,15 +1086,10 @@ function centerOnNode(node, opts = { animate: true }) {
         scale = start.s + (end.s - start.s) * e;
         $('#zoomReset').textContent = Math.round(scale * 100) + '%';
         scheduleRender();
-        if (p < 1) {
-            panAnimId = requestAnimationFrame(step);
-        } else {
-            panAnimId = null;
-        }
+        if (p < 1) { panAnimId = requestAnimationFrame(step); } else { panAnimId = null; }
     };
     panAnimId = requestAnimationFrame(step);
 }
-
 function fitToScreen() {
   if (!data) return; updateLayout();
   const rect = canvasContainer.getBoundingClientRect();
@@ -1027,117 +1099,38 @@ function fitToScreen() {
   scheduleRender(); $('#zoomReset').textContent = Math.round(scale * 100) + '%';
 }
 $('#btnFit').onclick = fitToScreen;
+$('#zoomIn').onclick = () => { scale = clamp(scale * 1.2, .1, 5); $('#zoomReset').textContent = Math.round(scale * 100) + '%'; scheduleRender(); };
+$('#zoomOut').onclick = () => { scale = clamp(scale / 1.2, .1, 5); $('#zoomReset').textContent = Math.round(scale * 100) + '%'; scheduleRender(); };
+$('#zoomReset').onclick = () => { scale = 1; panX = 80; panY = 60; $('#zoomReset').textContent = '100%'; scheduleRender(); };
 
-async function initializeGapiClient() {
-    await gapi.client.init({ apiKey: API_KEY, discoveryDocs: ['https://sheets.googleapis.com/$discovery/rest?version=v4'], });
-    gapiInited = true;
-    const savedTokenString = sessionStorage.getItem('oauthToken');
-    if (savedTokenString) { oauthToken = JSON.parse(savedTokenString); gapi.client.setToken(oauthToken); await loadUserInfo(); }
-    else { const tokenFound = handleRedirectCallback(); if (!tokenFound) { loadInitialData(); updateAuthUI(); } }
-}
-function handleRedirectCallback() {
-    const params = new URLSearchParams(window.location.hash.substring(1)); const token = params.get('access_token');
-    if (token) {
-        oauthToken = { access_token: token, token_type: 'Bearer' }; sessionStorage.setItem('oauthToken', JSON.stringify(oauthToken));
-        gapi.client.setToken(oauthToken); window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
-        loadUserInfo(); return true;
-    } return false;
-}
-function handleAuthClick() {
-    const oauth2Endpoint = 'https://accounts.google.com/o/oauth2/v2/auth';
-    const params = { 'client_id': CLIENT_ID, 'redirect_uri': window.location.href.split('#')[0], 'response_type': 'token', 'scope': 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile', 'include_granted_scopes': 'true', };
-    const form = document.createElement('form'); form.setAttribute('method', 'GET'); form.setAttribute('action', oauth2Endpoint);
-    for (var p in params) { const input = document.createElement('input'); input.setAttribute('type', 'hidden'); input.setAttribute('name', p); input.setAttribute('value', params[p]); form.appendChild(input); }
-    document.body.appendChild(form); form.submit();
-}
-function handleSignoutClick() { sessionStorage.removeItem('oauthToken'); isOwner = false; oauthToken = null; gapi.client.setToken(''); disableEditing(); updateAuthUI(); }
-async function loadUserInfo() {
-    let profile;
-    try {
-        const token = gapi.client.getToken(); if (!token) { throw new Error("User is not authenticated."); }
-        const fetchResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { 'Authorization': `Bearer ${token.access_token}` } });
-        if (!fetchResponse.ok) { const errorBody = await fetchResponse.json(); throw new Error(JSON.stringify(errorBody)); }
-        profile = await fetchResponse.json();
-    } catch (err) { console.error("Error loading user info:", err); handleSignoutClick(); alert("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."); loadInitialData(); return; }
-    if (profile.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
-        isOwner = true; authContainer.innerHTML = `Xin chào, <b>${profile.name}</b> (Quản trị)<br/><button id="signout-button" class="btn" style="width:100%; margin-top: 8px;">Đăng xuất</button>`;
-        $('#signout-button').onclick = handleSignoutClick; enableEditing();
-    } else { isOwner = false; authContainer.innerHTML = `Xin chào, <b>${profile.name}</b> (Chế độ xem)<br/><button id="signout-button" class="btn" style="width:100%; margin-top: 8px;">Đăng xuất</button>`; $('#signout-button').onclick = handleSignoutClick; disableEditing(); }
-    loadInitialData();
-}
-function updateAuthUI() { if (!isOwner) { authContainer.innerHTML = `<button id="signin-button" class="btn" style="width:100%">Đăng nhập để chỉnh sửa</button>`; $('#signin-button').onclick = handleAuthClick; } }
-async function loadInitialData() {
-    if (!gapiInited) return; let sheetData;
-    try {
-        sheetData = await gapi.client.sheets.spreadsheets.values.batchGet({ spreadsheetId: SPREADSHEET_ID, ranges: [`${SETTINGS_SHEET_NAME}!A:B`, `${MEDIA_SHEET_NAME}!A:Z`, `${INDEX_SHEET_NAME}!A:B`], });
-        const valueRanges = sheetData.result.valueRanges; const settingsRows = (valueRanges[0] && valueRanges[0].values) || [];
-        const mediaRows = (valueRanges[1] && valueRanges[1].values) || []; const indexRows = (valueRanges[2] && valueRanges[2].values);
-        const settings = settingsRows.reduce((acc, row) => { if(row[0]) acc[row[0]] = row[1]; return acc; }, {});
-        if (settings.bg_url) { canvasContainer.style.backgroundImage = `url(${settings.bg_url})`; $('#bgUrlInput').value = settings.bg_url; }
-        if (settings.gap_x) { gapX = parseInt(settings.gap_x, 10) || 40; $('#gapXSlider').value = gapX; $('#gapValueLabel').textContent = gapX; }
-        const centralTitle = settings.tree_title || 'Sơ Đồ Gia Phả'; savedTitle = centralTitle; appTitle.textContent = centralTitle; document.title = centralTitle;
-        decorationSettings.visible = String(settings.decoration_visible).toLowerCase() !== 'false';
-        decorationSettings.size = parseInt(settings.decoration_size, 10) || 150;
-        decorationSettings.distance = parseInt(settings.decoration_distance, 10) || 85; 
-        decorationSettings.url = settings.decoration_url || 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjJlY9mZoOpmFHf5dgVWM9KdN0TjY5InAd2PC8-vRzvjIPTo9eXDqrrSkSPX3k8chiuQFksSRfdcbbFF9bzihTqKcKuFsNMht-rmYCPFJyJ41-sMhExQlFaurQyXxQ1TtIyblsHvysUXcYuwDSiqyTzcV9eT1oGI_drresKj-uuiEF6ak6CZJ9jghGedMo/s1600/Asset%202@4x.png';
-        treeDecoration.src = decorationSettings.url; 
-        updateControlsUI();
-        allImages = []; allAudios = [];
-        if (mediaRows && mediaRows.length > 1) {
-            const headers = mediaRows[0].map(h => String(h).toLowerCase().trim()); const imgIdx = headers.indexOf('imageurl'); const nameIdx = headers.indexOf('imagename');
-            const audioIdx = headers.indexOf('audiourl'); const audioNameIdx = headers.indexOf('audioname');
-            for (let i = 1; i < mediaRows.length; i++) {
-                const row = mediaRows[i]; const imageUrl = row[imgIdx]; if (imgIdx > -1 && imageUrl) { allImages.push({ url: imageUrl, name: ((nameIdx > -1 && row[nameIdx]) ? row[nameIdx].trim() : `Ảnh ${i}`) }); }
-                const audioUrl = row[audioIdx]; if (audioIdx > -1 && audioUrl) { allAudios.push({ url: audioUrl, name: ((audioNameIdx > -1 && row[audioNameIdx]) ? row[audioNameIdx].trim() : `Audio ${i}`) }); }
-            }
-        }
-        populateImageSidebar(); populateAudioSidebar();
-        if (!indexRows || indexRows.length < 2) { throw new Error('Sheet "_index" không đúng định dạng.'); }
-        treeIndex = indexRows.slice(1).map(row => ({ displayName: row[0], sheetName: row[1] })).filter(t => t.displayName && t.sheetName);
-        populateTreeSelector();
-        const lastSelectedSheet = localStorage.getItem(LS_KEY_PREFIX + 'lastSelectedSheet');
-        const initialSheet = (treeIndex.find(t => t.sheetName === lastSelectedSheet))?.sheetName || (treeIndex[0]?.sheetName);
-        if (initialSheet) { treeSelector.value = initialSheet; await loadTreeData(initialSheet); }
-        else { throw new Error("Không có cây phả đồ nào hợp lệ trong sheet _index."); }
-    } catch (e) {
-        const errorMsg = e?.result?.error?.message || e.message || 'Lỗi không xác định.';
-        alert('Không thể tải dữ liệu. Chi tiết: ' + errorMsg); data = null; scheduleRender();
-    }
-}
-async function loadTreeData(sheetName) {
-    if (!sheetName) return; currentSheetName = sheetName; document.body.style.cursor = 'wait'; data = null; scheduleRender();
-    try {
-        const response = await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${sheetName}!A:G`, });
-        const treeRows = response.result.values; if (treeRows && treeRows.length > 0) { const csvText = treeRows.map(row => row.join(',')).join('\n'); data = fromCSV(csvText); }
-    } catch (e) { console.error(`Lỗi khi tải từ sheet "${sheetName}":`, e); alert(`Không thể tải phả đồ "${sheetName}".`); }
-    finally {
-        if (isOwner) {
-            await loadAndApplyProposals();
-        }
-        try { 
-            updateLayout(); 
-        } catch (err) {
-            console.error("Lỗi layout:", err); if (err.message.toLowerCase().includes("stack")) { alert("Lỗi Hiển Thị: Dữ liệu bị lặp vòng tròn. Vui lòng kiểm tra file Google Sheet."); }
-            else { alert("Lỗi khi hiển thị cây: " + err.message); } data = null;
-        }
-        
-        fitToScreen(); 
-        savedTitle = appTitle.textContent; localStorage.setItem(LS_KEY_PREFIX + 'lastSelectedSheet', sheetName);
-        document.body.style.cursor = 'default'; history = []; future = []; setUnsavedChanges(false);
-        if (isOwner) { $('#btnUndo').disabled = true; $('#btnRedo').disabled = true; }
-    }
-}
+// ===================================================================
+// ====== XÁC THỰC (NETLIFY IDENTITY) ======
+// ===================================================================
 
-async function saveSettingsToSheet() {
-    if (!isOwner) return; const bgUrl = $('#bgUrlInput').value.trim(); const currentGapX = $('#gapXSlider').value; const newTitle = appTitle.textContent.trim();
-    try {
-        await gapi.client.sheets.spreadsheets.values.update({
-            spreadsheetId: SPREADSHEET_ID, range: `${SETTINGS_SHEET_NAME}!A1:B7`, valueInputOption: 'USER-ENTERED',
-            resource: { values: [ ['bg_url', bgUrl], ['gap_x', currentGapX], ['tree_title', newTitle], ['decoration_visible', decorationSettings.visible], ['decoration_size', decorationSettings.size], ['decoration_distance', decorationSettings.distance], ['decoration_url', decorationSettings.url] ] }
-        });
-    } catch(err) { console.error("Lỗi khi lưu cài đặt:", err); }
+function handleLogin(user) {
+    console.log("Đăng nhập thành công:", user.email);
+    isOwner = true; 
+    authContainer.innerHTML = `Xin chào, <b>Admin</b><br/><button id="signout-button" class="btn" style="width:100%; margin-top: 8px;">Đăng xuất</button>`;
+    $('#signout-button').onclick = () => netlifyIdentity.logout();
+    enableEditing();
+    loadTreeData(currentTreeFileName); // Tải lại với quyền admin (sẽ thấy proposals)
 }
-function populateTreeSelector() { treeSelector.innerHTML = treeIndex.map(tree => `<option value="${tree.sheetName}">${tree.displayName}</option>`).join(''); }
+function handleLogout() {
+    console.log("Đã đăng xuất");
+    isOwner = false;
+    authContainer.innerHTML = `<button id="signin-button" class="btn" style="width:100%">Đăng nhập Admin</button>`;
+    $('#signin-button').onclick = () => netlifyIdentity.open();
+    disableEditing();
+    loadTreeData(currentTreeFileName); // Tải lại ở chế độ khách
+}
+function enableEditing() { document.body.classList.add('owner-mode'); appTitle.setAttribute('contenteditable', 'true'); }
+function disableEditing() { document.body.classList.remove('owner-mode'); }
+function getCssVar(name) { return getComputedStyle(document.body).getPropertyValue(name).trim(); }
+
+// ===================================================================
+// ====== KHỞI TẠO ỨNG DỤNG ======
+// ===================================================================
+function populateTreeSelector() { treeSelector.innerHTML = treeIndex.map(tree => `<option value="${tree.fileName}">${tree.displayName}</option>`).join(''); }
 function populateImageSidebar() {
     const imageGallery = $('#media-image-gallery'); imageGallery.innerHTML = '';
     if (allImages.length > 0) {
@@ -1189,149 +1182,6 @@ function showMedia(type, index) {
     }
     mediaViewer.classList.add('show'); updateImageViewer();
 }
-function enableEditing() { document.body.classList.add('owner-mode'); appTitle.setAttribute('contenteditable', 'true'); }
-function disableEditing() { document.body.classList.remove('owner-mode'); }
-function getCssVar(name) { return getComputedStyle(document.body).getPropertyValue(name).trim(); }
-
-function loadGoogleAPIs() {
-  const gapiScript = document.createElement('script');
-  gapiScript.src = 'https://apis.google.com/js/api.js';
-  gapiScript.defer = true;
-  gapiScript.onload = () => {
-    if (typeof gapiLoaded === 'function') {
-      gapiLoaded();
-    }
-  };
-  document.head.appendChild(gapiScript);
-
-  const gsiScript = document.createElement('script');
-  gsiScript.src = 'https://accounts.google.com/gsi/client';
-  gsiScript.defer = true;
-  gsiScript.onload = () => {
-    if (typeof gisLoaded === 'function') {
-      gisLoaded();
-    }
-  };
-  document.head.appendChild(gsiScript);
-}
-
-function init() {
-  loadGoogleAPIs();
-  new ResizeObserver(scheduleRender).observe(canvasContainer);
-  treeCanvas.addEventListener('click', handleCanvasClick);
-  treeCanvas.addEventListener('mousemove', handleCanvasMouseMove);
-
-  const overlay = $('#overlay');
-  const toggleSidebar = () => app.classList.toggle('sidebar-collapsed');
-  $('#btnToggleSidebar').onclick = toggleSidebar;
-
-  const searchContainer = $('#search-container');
-  const btnToggleSearch = $('#btnToggleSearch');
-
-  btnToggleSearch.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const isExpanded = searchContainer.classList.toggle('search-expanded');
-      if (isExpanded) {
-          searchInput.focus();
-      }
-  });
-  
-  searchInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      searchContainer.classList.remove('search-expanded');
-    }
-  });
-
-  document.addEventListener('click', (e) => {
-    if (!searchContainer.contains(e.target)) {
-      searchContainer.classList.remove('search-expanded');
-    }
-  });
-
-  
-  $('#gapXSlider').addEventListener('input', (e) => {
-      gapX = parseInt(e.target.value, 10);
-      $('#gapValueLabel').textContent = gapX;
-      updateLayout(); scheduleRender(); setUnsavedChanges(true);
-  });
-  $('#zoomIn').onclick = () => { scale = clamp(scale * 1.2, .1, 5); $('#zoomReset').textContent = Math.round(scale * 100) + '%'; scheduleRender(); };
-  $('#zoomOut').onclick = () => { scale = clamp(scale / 1.2, .1, 5); $('#zoomReset').textContent = Math.round(scale * 100) + '%'; scheduleRender(); };
-  $('#zoomReset').onclick = () => { scale = 1; panX = 80; panY = 60; $('#zoomReset').textContent = '100%'; scheduleRender(); };
-  
-  disableEditing();
-  $('#btnSaveChanges').onclick = saveAllChanges;
-  treeSelector.addEventListener('change', (e) => {
-      const newSheetName = e.target.value;
-      if (newSheetName !== currentSheetName) {
-          if (hasUnsavedChanges && !confirm('Bạn có thay đổi chưa lưu. Chắc chắn chuyển?')) { e.target.value = currentSheetName; return; }
-          loadTreeData(newSheetName);
-      }
-  });
-  
-  treeCanvas.addEventListener('wheel', (e) => {
-    e.preventDefault(); const rect = treeCanvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left, mouseY = e.clientY - rect.top;
-    const worldXBefore = (mouseX - panX) / scale, worldYBefore = (mouseY - panY) / scale;
-    const newScale = clamp(scale * (1 + e.deltaY * -0.001), .1, 5);
-    panX = mouseX - worldXBefore * newScale; panY = mouseY - worldYBefore * newScale;
-    scale = newScale; $('#zoomReset').textContent = Math.round(scale * 100) + '%';
-    scheduleRender();
-  }, { passive: false });
-  const hammer = new Hammer(treeCanvas); hammer.get('pinch').set({ enable: true });
-  let startPanX = 0, startPanY = 0, startScale = 1;
-  hammer.on('panstart', (e) => { startPanX = panX; startPanY = panY; });
-  hammer.on('panmove', (e) => { panX = startPanX + e.deltaX; panY = startPanY + e.deltaY; scheduleRender(); });
-  hammer.on('pinchstart', (e) => { startScale = scale; });
-  hammer.on('pinchmove', (e) => {
-      const newScale = clamp(startScale * e.scale, 0.1, 5); const rect = treeCanvas.getBoundingClientRect();
-      const pX = e.center.x - rect.left, pY = e.center.y - rect.top;
-      const wX = (pX - panX) / scale, wY = (pY - panY) / scale;
-      panX = pX - wX * newScale; panY = pY - wY * newScale; scale = newScale;
-      $('#zoomReset').textContent = Math.round(scale * 100) + '%'; scheduleRender();
-  });
-
-  $('#themeSelector').addEventListener('change', (e) => applyTheme(e.target.value));
-  const savedTheme = localStorage.getItem(THEME_KEY) || 'dark';
-  applyTheme(savedTheme);
-  
-  $('#bgUrlInput').addEventListener('input', () => setUnsavedChanges(true));
-  $('#appTitle').addEventListener('blur', () => { if(isOwner) setUnsavedChanges(true); });
-  
-  const decorationSizeSlider = $('#decorationSizeSlider'), decorationSizeLabel = $('#decorationSizeLabel');
-  const decorationDistanceSlider = $('#decorationDistanceSlider'), decorationDistanceLabel = $('#decorationDistanceLabel');
-  updateControlsUI();
-  $('#toggleDecoration').onchange = (e) => { decorationSettings.visible = e.target.checked; setUnsavedChanges(true); scheduleRender(); };
-  decorationSizeSlider.addEventListener('input', (e) => { decorationSettings.size = parseInt(e.target.value, 10); decorationSizeLabel.textContent = decorationSettings.size; setUnsavedChanges(true); scheduleRender(); });
-  decorationDistanceSlider.addEventListener('input', (e) => { decorationSettings.distance = parseInt(e.target.value, 10); decorationDistanceLabel.textContent = decorationSettings.distance; setUnsavedChanges(true); scheduleRender(); });
-  $('#decorationUrlInput').addEventListener('input', (e) => { 
-    decorationSettings.url = e.target.value; 
-    treeDecoration.src = e.target.value;
-    setUnsavedChanges(true); 
-  });
-  
-  const imageSidebar = $('#image-sidebar'), audioSidebar = $('#audio-sidebar'), globalAudioPlayer = $('#global-audio-player');
-  const closeAllMediaSidebars = () => { imageSidebar.classList.remove('show'); audioSidebar.classList.remove('show'); overlay.classList.remove('show-for-media'); };
-  $('#btnToggleImageAlbum').onclick = () => { audioSidebar.classList.remove('show'); imageSidebar.classList.toggle('show'); if (imageSidebar.classList.contains('show')) overlay.classList.add('show-for-media'); else overlay.classList.remove('show-for-media'); };
-  $('#btnToggleAudioAlbum').onclick = () => { imageSidebar.classList.remove('show'); audioSidebar.classList.toggle('show'); if (audioSidebar.classList.contains('show')) overlay.classList.add('show-for-media'); else overlay.classList.remove('show-for-media'); };
-  $('#btnCloseImage').onclick = () => { imageSidebar.classList.remove('show'); if (!audioSidebar.classList.contains('show')) overlay.classList.remove('show-for-media'); };
-  $('#btnCloseAudio').onclick = () => { audioSidebar.classList.remove('show'); if (!imageSidebar.classList.contains('show')) overlay.classList.remove('show-for-media'); };
-  $('#media-close').onclick = () => $('#media-viewer').classList.remove('show');
-  $('#media-viewer').onclick = (e) => { if (e.target.id === 'media-viewer') $('#media-viewer').classList.remove('show'); };
-  globalAudioPlayer.addEventListener('timeupdate', () => { const playingItem = $('.playlist-item.playing'); if (playingItem && globalAudioPlayer.duration) { const progress = (globalAudioPlayer.currentTime / globalAudioPlayer.duration) * 100; playingItem.querySelector('.progress-bar').style.width = `${progress}%`; } });
-  globalAudioPlayer.addEventListener('ended', () => { const playingItem = $('.playlist-item.playing'); if (playingItem) { playingItem.classList.remove('playing'); playingItem.querySelector('.play-icon').textContent = '▶'; playingItem.querySelector('.progress-bar').style.width = '0%'; } });
-  globalAudioPlayer.addEventListener('pause', () => { const playingItem = $('.playlist-item.playing'); if (playingItem) { playingItem.classList.remove('playing'); playingItem.querySelector('.play-icon').textContent = '▶'; } });
-  overlay.onclick = () => { if (overlay.classList.contains('show-for-media')) { closeAllMediaSidebars(); } else { toggleSidebar(); } };
-
-  $('#mAvatarFile').onchange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const imageUrl = await uploadImageToCloudinary(file);
-    if (imageUrl) {
-      $('#mAvatar').value = imageUrl;
-    }
-  };
-}
-
 function updateControlsUI() {
     const toggleDecoration = $('#toggleDecoration'), decorationSizeSlider = $('#decorationSizeSlider'), decorationSizeLabel = $('#decorationSizeLabel');
     const decorationDistanceSlider = $('#decorationDistanceSlider'), decorationDistanceLabel = $('#decorationDistanceLabel');
@@ -1357,6 +1207,108 @@ function generateHierarchicalId(parent) {
     }
     let suffix = 1; while (taken.has(suffix)) suffix++; return parent.id + '.' + suffix;
 }
+
+function init() {
+    // 1. Gắn các sự kiện cho Netlify Identity
+    netlifyIdentity.on('init', user => {
+        if (user) { handleLogin(user); } else { handleLogout(); }
+        loadInitialData(); // Tải dữ liệu lần đầu
+    });
+    netlifyIdentity.on('login', handleLogin);
+    netlifyIdentity.on('logout', handleLogout);
+    
+    // 2. Gắn các sự kiện giao diện
+    new ResizeObserver(scheduleRender).observe(canvasContainer);
+    treeCanvas.addEventListener('click', handleCanvasClick);
+    treeCanvas.addEventListener('mousemove', handleCanvasMouseMove);
+    const overlay = $('#overlay');
+    const toggleSidebar = () => app.classList.toggle('sidebar-collapsed');
+    $('#btnToggleSidebar').onclick = toggleSidebar;
+    const searchContainer = $('#search-container');
+    const btnToggleSearch = $('#btnToggleSearch');
+    btnToggleSearch.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isExpanded = searchContainer.classList.toggle('search-expanded');
+        if (isExpanded) { searchInput.focus(); }
+    });
+    searchInput.addEventListener('keydown', (e) => { if (e.key === 'Escape') { searchContainer.classList.remove('search-expanded'); } });
+    document.addEventListener('click', (e) => { if (!searchContainer.contains(e.target)) { searchContainer.classList.remove('search-expanded'); } });
+    $('#gapXSlider').addEventListener('input', (e) => {
+        gapX = parseInt(e.target.value, 10);
+        $('#gapValueLabel').textContent = gapX;
+        updateLayout(); scheduleRender(); setUnsavedChanges(true);
+    });
+    disableEditing();
+    $('#btnSaveChanges').onclick = saveAllChanges;
+    treeSelector.addEventListener('change', (e) => {
+        const newFileName = e.target.value;
+        if (newFileName !== currentTreeFileName) {
+            if (hasUnsavedChanges && !confirm('Bạn có thay đổi chưa lưu. Chắc chắn chuyển?')) {
+                e.target.value = currentTreeFileName; return; 
+            }
+            loadTreeData(newFileName);
+        }
+    });
+    treeCanvas.addEventListener('wheel', (e) => {
+      e.preventDefault(); const rect = treeCanvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left, mouseY = e.clientY - rect.top;
+      const worldXBefore = (mouseX - panX) / scale, worldYBefore = (mouseY - panY) / scale;
+      const newScale = clamp(scale * (1 + e.deltaY * -0.001), .1, 5);
+      panX = mouseX - worldXBefore * newScale; panY = mouseY - worldYBefore * newScale;
+      scale = newScale; $('#zoomReset').textContent = Math.round(scale * 100) + '%';
+      scheduleRender();
+    }, { passive: false });
+    const hammer = new Hammer(treeCanvas); hammer.get('pinch').set({ enable: true });
+    let startPanX = 0, startPanY = 0, startScale = 1;
+    hammer.on('panstart', (e) => { startPanX = panX; startPanY = panY; });
+    hammer.on('panmove', (e) => { panX = startPanX + e.deltaX; panY = startPanY + e.deltaY; scheduleRender(); });
+    hammer.on('pinchstart', (e) => { startScale = scale; });
+    hammer.on('pinchmove', (e) => {
+        const newScale = clamp(startScale * e.scale, 0.1, 5); const rect = treeCanvas.getBoundingClientRect();
+        const pX = e.center.x - rect.left, pY = e.center.y - rect.top;
+        const wX = (pX - panX) / scale, wY = (pY - panY) / scale;
+        panX = pX - wX * newScale; panY = pY - wY * newScale; scale = newScale;
+        $('#zoomReset').textContent = Math.round(scale * 100) + '%'; scheduleRender();
+    });
+    $('#themeSelector').addEventListener('change', (e) => applyTheme(e.target.value));
+    const savedTheme = localStorage.getItem(THEME_KEY) || 'dark';
+    applyTheme(savedTheme);
+    $('#bgUrlInput').addEventListener('input', () => setUnsavedChanges(true));
+    $('#appTitle').addEventListener('blur', () => { if(isOwner) setUnsavedChanges(true); });
+    const decorationSizeSlider = $('#decorationSizeSlider'), decorationSizeLabel = $('#decorationSizeLabel');
+    const decorationDistanceSlider = $('#decorationDistanceSlider'), decorationDistanceLabel = $('#decorationDistanceLabel');
+    updateControlsUI();
+    $('#toggleDecoration').onchange = (e) => { decorationSettings.visible = e.target.checked; setUnsavedChanges(true); scheduleRender(); };
+    decorationSizeSlider.addEventListener('input', (e) => { decorationSettings.size = parseInt(e.target.value, 10); decorationSizeLabel.textContent = decorationSettings.size; setUnsavedChanges(true); scheduleRender(); });
+    decorationDistanceSlider.addEventListener('input', (e) => { decorationSettings.distance = parseInt(e.target.value, 10); decorationDistanceLabel.textContent = decorationSettings.distance; setUnsavedChanges(true); scheduleRender(); });
+    $('#decorationUrlInput').addEventListener('input', (e) => { 
+      decorationSettings.url = e.target.value; treeDecoration.src = e.target.value;
+      setUnsavedChanges(true); 
+    });
+    const imageSidebar = $('#image-sidebar'), audioSidebar = $('#audio-sidebar'), globalAudioPlayer = $('#global-audio-player');
+    const closeAllMediaSidebars = () => { imageSidebar.classList.remove('show'); audioSidebar.classList.remove('show'); overlay.classList.remove('show-for-media'); };
+    $('#btnToggleImageAlbum').onclick = () => { audioSidebar.classList.remove('show'); imageSidebar.classList.toggle('show'); if (imageSidebar.classList.contains('show')) overlay.classList.add('show-for-media'); else overlay.classList.remove('show-for-media'); };
+    $('#btnToggleAudioAlbum').onclick = () => { imageSidebar.classList.remove('show'); audioSidebar.classList.toggle('show'); if (audioSidebar.classList.contains('show')) overlay.classList.add('show-for-media'); else overlay.classList.remove('show-for-media'); };
+    $('#btnCloseImage').onclick = () => { imageSidebar.classList.remove('show'); if (!audioSidebar.classList.contains('show')) overlay.classList.remove('show-for-media'); };
+    $('#btnCloseAudio').onclick = () => { audioSidebar.classList.remove('show'); if (!imageSidebar.classList.contains('show')) overlay.classList.remove('show-for-media'); };
+    $('#media-close').onclick = () => $('#media-viewer').classList.remove('show');
+    $('#media-viewer').onclick = (e) => { if (e.target.id === 'media-viewer') $('#media-viewer').classList.remove('show'); };
+    globalAudioPlayer.addEventListener('timeupdate', () => { const playingItem = $('.playlist-item.playing'); if (playingItem && globalAudioPlayer.duration) { const progress = (globalAudioPlayer.currentTime / globalAudioPlayer.duration) * 100; playingItem.querySelector('.progress-bar').style.width = `${progress}%`; } });
+    globalAudioPlayer.addEventListener('ended', () => { const playingItem = $('.playlist-item.playing'); if (playingItem) { playingItem.classList.remove('playing'); playingItem.querySelector('.play-icon').textContent = '▶'; playingItem.querySelector('.progress-bar').style.width = '0%'; } });
+    globalAudioPlayer.addEventListener('pause', () => { const playingItem = $('.playlist-item.playing'); if (playingItem) { playingItem.classList.remove('playing'); playingItem.querySelector('.play-icon').textContent = '▶'; } });
+    overlay.onclick = () => { if (overlay.classList.contains('show-for-media')) { closeAllMediaSidebars(); } else { toggleSidebar(); } };
+    
+    // Sự kiện cho input file avatar
+    $('#mAvatarFile').onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const imageUrl = await uploadImageToGitHub(file);
+      if (imageUrl) {
+        $('#mAvatar').value = imageUrl;
+      }
+    };
+}
+
 window.addEventListener('keydown', (e) => {
   if (e.target.matches('input,textarea,h1')) return;
   if(isOwner){
@@ -1366,18 +1318,15 @@ window.addEventListener('keydown', (e) => {
   if (e.key.toLowerCase() === 'f') { e.preventDefault(); fitToScreen(); }
   if (highlightedNodeId && isOwner) {
       const node = findById(data, highlightedNodeId);
-      if(node && !node.isProposal) { 
+      if(node) { 
         if (e.key.toLowerCase() === 'a') { e.preventDefault(); onAdd(node); }
         if (e.key.toLowerCase() === 'e') { e.preventDefault(); onEdit(node); }
         if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); onDel(node); }
       }
   }
   if (e.key === 'Escape') {
-      appTitle.blur();
-      highlightedNodeId = null;
-      updateSelectionActions();
-      updateInfoPanel(null);
-      scheduleRender();
+      appTitle.blur(); highlightedNodeId = null;
+      updateSelectionActions(); updateInfoPanel(null); scheduleRender();
   }
 });
 
@@ -1389,222 +1338,13 @@ function applyTheme(theme) {
     scheduleRender();
 }
 
-init();
-
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js')
-      .then(registration => {
-        console.log('ServiceWorker registration successful with scope: ', registration.scope);
-      })
-      .catch(err => {
-        console.log('ServiceWorker registration failed: ', err);
-      });
+      .then(registration => { console.log('SW registered: ', registration.scope); })
+      .catch(err => { console.log('SW registration failed: ', err); });
   });
 }
 
-// ===================================================================
-// ====== CÁC HÀM MỚI CHO TÍNH NĂNG ĐỀ XUẤT ======
-// ===================================================================
-
-function onProposeChild(parentNode) {
-    openModal('Đề xuất thêm con cho ' + parentNode.name, {}, async (newData) => {
-        const tempChildNode = {
-            id: 'proposal_' + Date.now(),
-            name: newData.name,
-            birth: newData.birth,
-            death: newData.death,
-            note: newData.note,
-            avatarUrl: newData.avatarUrl,
-            children: [],
-            isProposal: true,
-            parentId: parentNode.id
-        };
-
-        if (!parentNode.children) parentNode.children = [];
-        parentNode.children.push(tempChildNode);
-        
-        setTimeout(() => {
-            console.log("Adding proposal node to view:", tempChildNode);
-            updateLayout();
-            scheduleRender();
-        }, 0);
-
-        alert('Đã gửi đề xuất của bạn. Vui lòng chờ quản trị viên phê duyệt.');
-        await saveProposalToSheet(tempChildNode, currentSheetName);
-    });
-}
-
-async function saveProposalToSheet(nodeData, sheetName) {
-    if (!PROPOSAL_WEB_APP_URL || PROPOSAL_WEB_APP_URL === 'DÁN_WEB_APP_URL_CỦA_BẠN_VÀO_ĐÂY') {
-        console.error("Lỗi cấu hình: Vui lòng dán Web App URL vào hằng số PROPOSAL_WEB_APP_URL.");
-        alert("Lỗi cấu hình. Không thể gửi đề xuất.");
-        return;
-    }
-    
-    try {
-        const payload = {
-            treeId: sheetName,
-            parentId: nodeData.parentId,
-            name: nodeData.name,
-            birth: nodeData.birth,
-            death: nodeData.death,
-            note: nodeData.note,
-            avatarUrl: nodeData.avatarUrl,
-            proposalId: nodeData.id
-        };
-
-        const response = await fetch(PROPOSAL_WEB_APP_URL, {
-            method: 'POST',
-            body: JSON.stringify(payload),
-            headers: {
-                'Content-Type': 'text/plain;charset=utf-8',
-            },
-        });
-        
-        console.log("Proposal data sent to Web App.");
-
-    } catch (err) {
-        console.error("Lỗi nghiêm trọng khi gửi đề xuất đến Web App:", err);
-        alert("Đã xảy ra lỗi khi gửi đề xuất của bạn. Vui lòng kiểm tra Console (F12) để biết chi tiết.");
-    }
-}
-
-
-async function loadAndApplyProposals() {
-    if (!data || !isOwner) return;
-    console.log(`Admin mode: Loading proposals for tree '${currentSheetName}'...`);
-    try {
-        const response = await gapi.client.sheets.spreadsheets.values.get({
-            spreadsheetId: PROPOSALS_SPREADSHEET_ID,
-            range: `${PROPOSALS_SHEET_NAME}!A:I`,
-        });
-        const proposals = response.result.values;
-        if (proposals && proposals.length > 1) {
-            const headers = proposals[0].map(h => String(h).toLowerCase().trim());
-            
-            const treeIdIdx = headers.indexOf('treeid');
-            const parentIdIdx = headers.indexOf('parentid');
-            const nameIdx = headers.indexOf('name');
-            const proposalIdIdx = headers.indexOf('proposalid');
-
-            if (treeIdIdx === -1 || parentIdIdx === -1) {
-                console.error("LỖI CẤU HÌNH SHEET 'Dexuat': Không tìm thấy cột 'treeId' hoặc 'parentId'. Vui lòng kiểm tra lại tên cột trong Google Sheet.");
-                alert("Lỗi cấu hình sheet đề xuất. Vui lòng kiểm tra Console (F12) để biết chi tiết.");
-                return;
-            }
-
-            const birthIdx = headers.indexOf('birth');
-            const deathIdx = headers.indexOf('death');
-            const noteIdx = headers.indexOf('note');
-            const avatarIdx = headers.indexOf('avatarurl');
-
-            let loadedCount = 0;
-            for (let i = 1; i < proposals.length; i++) {
-                const row = proposals[i];
-                if (!row || row.length === 0) continue;
-
-                const proposalTreeId = row[treeIdIdx];
-
-                if (proposalTreeId === currentSheetName) {
-                    let parentId = row[parentIdIdx];
-                    if (parentId && typeof parentId === 'string' && parentId.startsWith("'")) {
-                        parentId = parentId.substring(1);
-                    }
-                    
-                    const parentNode = findById(data, parentId);
-                    if (parentNode) {
-                        loadedCount++;
-                        const proposalNode = {
-                            id: row[proposalIdIdx] || 'proposal_loaded_' + i,
-                            parentId: parentId,
-                            name: row[nameIdx] || 'Chưa đặt tên',
-                            birth: row[birthIdx] || '',
-                            death: row[deathIdx] || '',
-                            note: row[noteIdx] || '',
-                            avatarUrl: row[avatarIdx] || '',
-                            children: [],
-                            isProposal: true,
-                            proposalRow: i + 1
-                        };
-                        if (!parentNode.children) parentNode.children = [];
-                        parentNode.children.push(proposalNode);
-                    } else {
-                        console.warn(`Parent node with id '${parentId}' NOT FOUND for proposal in row ${i+1}.`);
-                    }
-                }
-            }
-            console.log(`Found and loaded ${loadedCount} proposal(s) for this tree.`);
-        } else {
-            console.log("No proposals found in the sheet.");
-        }
-    } catch (err) {
-        console.error("Không thể tải danh sách đề xuất:", err.result?.error?.message || err.message);
-    }
-}
-
-async function onAcceptProposal(node) {
-    pushHistory();
-    
-    delete node.isProposal;
-    node.id = generateHierarchicalId(findParent(data, node.id));
-    
-    setUnsavedChanges(true);
-    await saveAllChanges();
-
-    await deleteProposalFromSheet(node.proposalRow);
-
-    highlightedNodeId = null;
-    updateSelectionActions();
-    updateLayout();
-    scheduleRender();
-    alert('Đã chấp nhận và thêm thành viên mới vào gia phả.');
-}
-
-async function onRejectProposal(node) {
-    pushHistory();
-
-    const parent = findParent(data, node.id);
-    if (parent && parent.children) {
-        parent.children = parent.children.filter(c => c.id !== node.id);
-    }
-    
-    await deleteProposalFromSheet(node.proposalRow);
-    
-    highlightedNodeId = null;
-    updateSelectionActions();
-    updateLayout();
-    scheduleRender();
-    alert('Đã từ chối đề xuất.');
-}
-
-async function deleteProposalFromSheet(rowIndex) {
-    try {
-        const sheetResponse = await gapi.client.sheets.spreadsheets.get({
-            spreadsheetId: PROPOSALS_SPREADSHEET_ID
-        });
-        const sheet = sheetResponse.result.sheets.find(s => s.properties.title === PROPOSALS_SHEET_NAME);
-        if(!sheet) throw new Error(`Sheet with name "${PROPOSALS_SHEET_NAME}" not found.`);
-        const sheetId = sheet.properties.sheetId;
-
-        await gapi.client.sheets.spreadsheets.batchUpdate({
-            spreadsheetId: PROPOSALS_SPREADSHEET_ID,
-            resource: {
-                requests: [{
-                    deleteDimension: {
-                        range: {
-                            sheetId: sheetId,
-                            dimension: 'ROWS',
-                            startIndex: rowIndex - 1,
-                            endIndex: rowIndex
-                        }
-                    }
-                }]
-            }
-        });
-        console.log(`Successfully deleted row ${rowIndex} from proposal sheet.`);
-    } catch (err) {
-        console.error("Lỗi khi xóa dòng đề xuất:", err.result?.error?.message || err.message);
-        alert("Lỗi khi xóa đề xuất khỏi Google Sheet. Vui lòng thử xóa thủ công.");
-    }
-}
+// Bắt đầu chạy ứng dụng
+init();
