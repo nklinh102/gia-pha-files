@@ -4,14 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Sơ Đồ Gia Phả</title>
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KGNNHQJWD1"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
     
-      gtag('config', 'G-KGNNHQJWD1');
-    </script>
+    <script type="text/javascript" src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -23,14 +17,6 @@
     <link rel="stylesheet" href="styles.css">
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
-
-    <script>
-      function startApp() {
-        gapi.load('client', initializeGapiClient);
-      }
-      window.gapiLoaded = startApp;
-      window.gisLoaded = () => {};
-    </script>
 </head>
 <body data-theme='dark'>
     <header id='app-header'>
@@ -174,8 +160,8 @@
                   <span class='info-label'>Anh em:</span>
                   <span id='info-brothers' class='info-value'></span>
                 </div>
-          </div>
-          </div>
+              </div>
+              </div>
 
         </div>
      
@@ -199,7 +185,7 @@
           <header>
               <div style='flex-grow: 1;'>
                   <h1>Album Hình Ảnh</h1>
-                  <div class='sub'>Hình ảnh dòng họ Nguyễn Hồng</div>
+                  <div class='sub'>Hình ảnh dòng họ</div>
               </div>
               <button class='btn' id='btnCloseImage' title='Đóng'>&#215;</button>
           </header>
@@ -215,7 +201,7 @@
           <header>
               <div style='flex-grow: 1;'>
                   <h1>Album Âm Thanh</h1>
-                  <div class='sub'>Audio Lịch sử dòng họ Nguyễn Hồng</div>
+                  <div class='sub'>Audio Lịch sử dòng họ</div>
               </div>
               <button class='btn' id='btnCloseAudio' title='Đóng'>&#215;</button>
           </header>
@@ -273,4 +259,3 @@
     <script src="script.js" defer></script>
 </body>
 </html>
-
