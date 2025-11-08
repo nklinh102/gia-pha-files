@@ -1,0 +1,31 @@
+{
+  "settings": {
+    "bg_url": "https://cdn.jsdelivr.net/gh/nklinh102/gia-pha-files@main/images/anhnen.jpg",
+    "gap_x": 40,
+    "tree_title": "Gia Phả",
+    "decoration_visible": true,
+    "decoration_size": 150,
+    "decoration_distance": 85,
+    "decoration_url": "https://cdn.jsdelivr.net/gh/nklinh102/gia-pha-files@main/images/Cuonthu.png"
+  },
+  "media": {
+    "images": [
+      {
+        "url": "https://cdn.jsdelivr.net/gh/nklinh102/gia-pha-files@main/media/images/Artboard%2012.png",
+        "name": "Ảnh kỷ niệm 1"
+      }
+    ],
+    "audios": [
+      {
+        "url": "https://cdn.jsdelivr.net/gh/TEN_GITHUB_CUA_BAN/TEN_REPO_CUA_BAN@main/media/audio/audio-1.mp3",
+        "name": "Audio lịch sử"
+      }
+    ]
+  },
+  "treeIndex": [
+    {
+      "displayName": "Phả đồ Họ Nguyễn",
+      "fileName": "tree-ho-nguyen.json"
+    }
+  ]
+}
